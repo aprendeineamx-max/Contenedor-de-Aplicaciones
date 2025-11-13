@@ -35,10 +35,6 @@ impl ContainerService {
         }
     }
 
-    pub fn store(&self) -> &InMemoryStore {
-        &self.inner.store
-    }
-
     pub async fn create_container(
         &self,
         name: String,

@@ -30,10 +30,6 @@ impl InMemoryStore {
         self.containers.read().await.values().cloned().collect()
     }
 
-    pub async fn get_container(&self, id: Uuid) -> Option<ContainerModel> {
-        self.containers.read().await.get(&id).cloned()
-    }
-
     pub async fn upsert_task(&self, task: TaskModel) {
         self.tasks.write().await.insert(task.id, task);
     }
