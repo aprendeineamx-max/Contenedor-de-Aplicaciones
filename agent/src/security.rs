@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::{config::SecurityConfig, store::SqliteStore};
+use crate::{config::SecurityConfig, models::ApiTokenInfo, store::SqliteStore};
 
 #[derive(Clone)]
 pub struct AuthManager {
@@ -26,6 +26,14 @@ pub struct SecuritySnapshot {
     pub auth_enabled: bool,
     pub admin_token_present: bool,
     pub static_token_count: usize,
+    pub managed_token_count: i64,
+}
+
+#[derive(Debug, Clone)]
+pub enum AuthContext {
+    Admin,
+    StaticToken { token: String },
+    ServiceToken { token: ApiTokenInfo },
 }
 
 impl AuthManager {
@@ -43,11 +51,20 @@ impl AuthManager {
     }
 
     pub async fn snapshot(&self) -> SecuritySnapshot {
-        let config = self.inner.config.read().await;
+        let (auth_enabled, admin_token_present, static_token_count) = {
+            let config = self.inner.config.read().await;
+            (
+                config.auth_enabled,
+                config.admin_token.is_some(),
+                config.api_tokens.len(),
+            )
+        };
+        let managed_token_count = self.inner.store.count_active_tokens().await.unwrap_or(0);
         SecuritySnapshot {
-            auth_enabled: config.auth_enabled,
-            admin_token_present: config.admin_token.is_some(),
-            static_token_count: config.api_tokens.len(),
+            auth_enabled,
+            admin_token_present,
+            static_token_count,
+            managed_token_count,
         }
     }
 
@@ -55,43 +72,48 @@ impl AuthManager {
         *self.inner.config.write().await = config;
     }
 
-    pub async fn authorize(&self, header: Option<&str>) -> bool {
+    pub async fn authorize(&self, header: Option<&str>) -> Option<AuthContext> {
         if !self.enabled().await {
-            return true;
+            return Some(AuthContext::Admin);
         }
 
-        let Some(token) = header.and_then(parse_bearer) else {
-            return false;
-        };
+        let token = header.and_then(parse_bearer)?;
 
         {
             let config = self.inner.config.read().await;
             if let Some(admin) = &config.admin_token {
                 if *admin == token {
-                    return true;
+                    return Some(AuthContext::Admin);
                 }
             }
 
             if config.api_tokens.iter().any(|t| t == &token) {
-                return true;
+                return Some(AuthContext::StaticToken {
+                    token: token.clone(),
+                });
             }
         }
 
         match self
             .inner
             .store
-            .verify_api_token_hash(&hash_token(&token))
+            .resolve_api_token(&hash_token(&token))
             .await
         {
-            Ok(valid) => valid,
+            Ok(Some(info)) => Some(AuthContext::ServiceToken { token: info }),
+            Ok(None) => None,
             Err(err) => {
                 tracing::error!(
                     ?err,
                     "No se pudo validar token de servicio en la base de datos"
                 );
-                false
+                None
             }
         }
+    }
+
+    pub async fn is_authorized(&self, header: Option<&str>) -> bool {
+        self.authorize(header).await.is_some()
     }
 }
 
@@ -119,7 +141,7 @@ pub async fn auth_middleware(
             .headers()
             .get(axum::http::header::AUTHORIZATION)
             .and_then(|value| value.to_str().ok());
-        if !manager.authorize(header).await {
+        if !manager.is_authorized(header).await {
             return Err(StatusCode::UNAUTHORIZED);
         }
     }

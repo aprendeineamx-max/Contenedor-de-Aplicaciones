@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, time::Duration as StdDuration};
 
 use agent::{
     config::{AgentConfig, SecurityConfig},
@@ -11,6 +11,7 @@ use agent::{
 use reqwest::{Client, StatusCode};
 use serde_json;
 use tempfile::TempDir;
+use time::{Duration as TimeDuration, OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
@@ -70,7 +71,7 @@ async fn containers_endpoint_creates_tasks() -> anyhow::Result<()> {
     let (tx, rx) = oneshot::channel();
     let server_handle = tokio::spawn(async move { server::serve(state, rx).await });
 
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    tokio::time::sleep(StdDuration::from_millis(200)).await;
 
     let client = Client::new();
     let create_res = client
@@ -86,7 +87,7 @@ async fn containers_endpoint_creates_tasks() -> anyhow::Result<()> {
     let task_id = Uuid::parse_str(task.get("id").unwrap().as_str().unwrap())?;
     let task_id_str = task_id.to_string();
 
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(StdDuration::from_secs(1)).await;
 
     let tasks: Vec<serde_json::Value> = client
         .get(format!("http://{}/tasks", config.api_bind))
@@ -190,7 +191,7 @@ async fn auth_rejects_without_token() -> anyhow::Result<()> {
     let (tx, rx) = oneshot::channel();
     let server_handle = tokio::spawn(async move { server::serve(state, rx).await });
 
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    tokio::time::sleep(StdDuration::from_millis(200)).await;
 
     let client = Client::new();
     let body = serde_json::json!({ "name": "secure-test", "platform": "windows-x64" });
@@ -254,17 +255,25 @@ async fn service_tokens_flow_and_reload() -> anyhow::Result<()> {
 
     let (tx, rx) = oneshot::channel();
     let server_handle = tokio::spawn(async move { server::serve(state, rx).await });
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    tokio::time::sleep(StdDuration::from_millis(200)).await;
 
     let client = Client::new();
     let base = format!("http://{}", config.api_bind);
     let body = serde_json::json!({ "name": "cli-token", "platform": "windows-x64" });
 
     // Emit token usando el admin.
+    let expires_at = (OffsetDateTime::now_utc() + TimeDuration::hours(1))
+        .format(&Rfc3339)
+        .expect("fecha valida");
+
     let create_res = client
         .post(format!("{base}/security/tokens"))
         .header("Authorization", "Bearer root-admin")
-        .json(&serde_json::json!({ "name": "cli" }))
+        .json(&serde_json::json!({
+            "name": "cli",
+            "scopes": ["containers:write", "tasks:read"],
+            "expires_at": expires_at
+        }))
         .send()
         .await?;
     assert_eq!(create_res.status(), StatusCode::CREATED);
@@ -279,6 +288,18 @@ async fn service_tokens_flow_and_reload() -> anyhow::Result<()> {
         .and_then(|v| v.as_str())
         .expect("id emitido");
     let issued_id = Uuid::parse_str(issued_id)?;
+    let scopes = created
+        .get("scopes")
+        .and_then(|v| v.as_array())
+        .expect("scopes array");
+    assert!(scopes.iter().any(|value| value == "containers:write"));
+    assert_eq!(
+        created
+            .get("expires_at")
+            .and_then(|v| v.as_str())
+            .expect("expires_at"),
+        expires_at
+    );
 
     let unauthorized = client
         .post(format!("{base}/containers"))
@@ -325,6 +346,20 @@ async fn service_tokens_flow_and_reload() -> anyhow::Result<()> {
         .send()
         .await?;
     assert!(reload.status().is_success());
+    let reload_body: serde_json::Value = reload.json().await?;
+    assert!(reload_body.get("scopes_catalog").is_some());
+    assert!(
+        reload_body
+            .get("managed_token_count")
+            .and_then(|v| v.as_u64())
+            .is_some()
+    );
+    assert!(
+        reload_body
+            .get("expiring_token_count")
+            .and_then(|v| v.as_u64())
+            .is_some()
+    );
 
     let static_token_call = client
         .post(format!("{base}/containers"))

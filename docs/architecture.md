@@ -77,6 +77,11 @@ Containers/
 - Sandboxing adicional con Windows Defender Application Control policies para procesos del contenedor.  
 - Auditoría: cada acción registra usuario, timestamp, hash de instalador y resultados.
 
+### Gestion de configuracion y secretos
+- La configuracion base residira en "config/orbit.toml" y se complementara con overrides locales ("orbit-data/config.local.toml").
+- Las variables de entorno siguen teniendo prioridad para credenciales y rutas sensibles ("ORBIT_ADMIN_TOKEN", "ORBIT_DB_PATH", etc.).
+- Se expondran endpoints /system/config (solo lectura admin) y /system/security/reload (hot reload existente) para aplicar cambios sin reiniciar.
+- Los tokens de servicio incluyen scopes, expiracion y "last_used_at", preparando la futura interfaz para auditoria y control de permisos.
 ## Observabilidad
 - Logging estructurado vía OpenTelemetry + `tracing` crate.  
 - Métricas expuestas en `/metrics` (Prometheus).  
@@ -86,5 +91,6 @@ Containers/
 - Hooking debe cubrir APIs Win32 clásicas y .NET (CreateFile/RegSetValue).  
 - Manejar drivers/servicios instalados por la app (advertir limitaciones o usar modo Hyper-V para casos extremos).  
 - Controlar accesos a recursos globales (imágenes COM, servicios) mediante plantillas de permisos.
+
 
 

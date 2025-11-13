@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "regenerate-sdks": "node scripts/regenerate-sdks.mjs"
+    "regenerate-sdks": "node scripts/regenerate-sdks.mjs",
+    "smoke": "node scripts/smoke.mjs"
   },
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "2.25.0"

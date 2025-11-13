@@ -39,10 +39,28 @@ export interface ApiToken {
     prefix: string;
     /**
      * 
+     * @type {Array<string>}
+     * @memberof ApiToken
+     */
+    scopes?: Array<string>;
+    /**
+     * 
      * @type {Date}
      * @memberof ApiToken
      */
     createdAt: Date;
+    /**
+     * 
+     * @type {Date}
+     * @memberof ApiToken
+     */
+    expiresAt?: Date;
+    /**
+     * 
+     * @type {Date}
+     * @memberof ApiToken
+     */
+    lastUsedAt?: Date;
     /**
      * 
      * @type {Date}
@@ -75,7 +93,10 @@ export function ApiTokenFromJSONTyped(json: any, ignoreDiscriminator: boolean): 
         'id': json['id'],
         'name': json['name'],
         'prefix': json['prefix'],
+        'scopes': json['scopes'] == null ? undefined : json['scopes'],
         'createdAt': (new Date(json['created_at'])),
+        'expiresAt': json['expires_at'] == null ? undefined : (new Date(json['expires_at'])),
+        'lastUsedAt': json['last_used_at'] == null ? undefined : (new Date(json['last_used_at'])),
         'revokedAt': json['revoked_at'] == null ? undefined : (new Date(json['revoked_at'])),
     };
 }
@@ -94,7 +115,10 @@ export function ApiTokenToJSONTyped(value?: ApiToken | null, ignoreDiscriminator
         'id': value['id'],
         'name': value['name'],
         'prefix': value['prefix'],
+        'scopes': value['scopes'],
         'created_at': value['createdAt'].toISOString(),
+        'expires_at': value['expiresAt'] == null ? value['expiresAt'] : value['expiresAt'].toISOString(),
+        'last_used_at': value['lastUsedAt'] == null ? value['lastUsedAt'] : value['lastUsedAt'].toISOString(),
         'revoked_at': value['revokedAt'] == null ? value['revokedAt'] : value['revokedAt'].toISOString(),
     };
 }

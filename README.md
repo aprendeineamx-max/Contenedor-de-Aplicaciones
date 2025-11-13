@@ -43,3 +43,11 @@ Para recargar cambios sin reiniciar el proceso usa `POST /system/security/reload
 - `DELETE /security/tokens/{id}`: revoca un token activo.
 
 Los tokens emitidos se almacenan en la tabla `api_tokens` con hash SHA-256 y los prefijos permiten auditarlos desde la UI o CLI sin exponer el valor real.
+
+#### Scopes y caducidad
+
+Cada token de servicio puede declararse con un conjunto de scopes (`containers:read`, `containers:write`, `tasks:read`, etc.) y una fecha de expiracion RFC3339. El agente persiste `scopes`, `expires_at` y `last_used_at` para que la UI pueda mostrar reglas de acceso, advertir sobre caducidades y preparar una futura capa de permisos granulares. El endpoint `/system/security/reload` ahora devuelve un resumen (`managed_token_count`, `expiring_token_count`, `scopes_catalog`) para poblar dashboards y alertas.
+
+### Pruebas end-to-end rapidas
+
+Ejecuta `npm run smoke` desde la raiz para lanzar el agente temporalmente (con `cargo run`), emitir un token via SDK TypeScript, crear un contenedor y validar que la API responde. El script usa el SDK generado en `clients/panel-sdk` y simula el camino panel → API, por lo que es ideal antes de integrar una UI real.

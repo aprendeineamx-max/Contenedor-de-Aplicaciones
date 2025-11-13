@@ -260,12 +260,15 @@ impl Snapshot {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiTokenInfo {
     pub id: Uuid,
     pub name: String,
     pub prefix: String,
+    pub scopes: Vec<String>,
     pub created_at: String,
+    pub expires_at: Option<String>,
+    pub last_used_at: Option<String>,
     pub revoked_at: Option<String>,
 }
 

@@ -1,7 +1,8 @@
-use std::{path::Path, sync::Arc};
+use std::{collections::BTreeSet, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use rand::{Rng, distr::Alphanumeric, rng};
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio::{fs, sync::Mutex};
 use uuid::Uuid;
 
@@ -295,16 +296,33 @@ pub struct IssuedToken {
     pub info: ApiTokenInfo,
 }
 
+#[derive(Clone)]
+pub struct TokenSpec {
+    pub name: String,
+    pub scopes: Vec<String>,
+    pub expires_at: Option<OffsetDateTime>,
+}
+
 impl TokenService {
     pub fn new(store: SqliteStore) -> Self {
         Self { store }
     }
 
-    pub async fn issue(&self, name: String) -> Result<IssuedToken> {
+    pub async fn issue(&self, spec: TokenSpec) -> Result<IssuedToken> {
         let secret = generate_service_token();
         let prefix = token_prefix(&secret);
         let hash = hash_token(&secret);
-        let info = self.store.create_api_token(name, hash, prefix).await?;
+        let TokenSpec {
+            name,
+            scopes,
+            expires_at,
+        } = spec;
+        let sanitized_scopes = sanitize_scopes(scopes);
+        let expires_at = expires_at.map(format_timestamp);
+        let info = self
+            .store
+            .create_api_token(name, sanitized_scopes, hash, prefix, expires_at)
+            .await?;
 
         Ok(IssuedToken { secret, info })
     }
@@ -316,6 +334,23 @@ impl TokenService {
     pub async fn revoke(&self, id: Uuid) -> Result<bool> {
         self.store.revoke_api_token(id).await
     }
+}
+
+fn sanitize_scopes(scopes: Vec<String>) -> Vec<String> {
+    let mut unique = BTreeSet::new();
+    for scope in scopes {
+        let trimmed = scope.trim();
+        if !trimmed.is_empty() {
+            unique.insert(trimmed.to_string());
+        }
+    }
+    unique.into_iter().collect()
+}
+
+fn format_timestamp(value: OffsetDateTime) -> String {
+    value
+        .format(&Rfc3339)
+        .unwrap_or_else(|_| "1970-01-01T00:00:00Z".into())
 }
 
 fn generate_service_token() -> String {

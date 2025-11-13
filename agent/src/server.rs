@@ -1,4 +1,4 @@
-use std::{convert::Infallible, time::Duration};
+use std::{collections::BTreeSet, convert::Infallible, time::Duration as StdDuration};
 
 use anyhow::Result;
 use axum::{
@@ -20,11 +20,11 @@ use crate::{
     events::EventHub,
     models::{ApiTokenInfo, AppInstance, ContainerModel, Snapshot, SnapshotType, TaskModel},
     security::{AuthManager, auth_middleware},
-    services::{AppService, ContainerService, SnapshotService, TokenService},
+    services::{AppService, ContainerService, SnapshotService, TokenService, TokenSpec},
     store::SqliteStore,
     virtualization::Platform,
 };
-use time::OffsetDateTime;
+use time::{Duration, OffsetDateTime, format_description::well_known::Rfc3339};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -135,6 +135,8 @@ struct SecurityReloadResponse {
     admin_token_present: bool,
     static_token_count: usize,
     managed_token_count: u64,
+    expiring_token_count: u64,
+    scopes_catalog: Vec<String>,
 }
 
 async fn reload_security(
@@ -143,16 +145,29 @@ async fn reload_security(
     let latest = SecurityConfig::from_env();
     state.auth.reload(latest).await;
     let snapshot = state.auth.snapshot().await;
-    let managed = state.store.count_active_tokens().await.map_err(|err| {
-        tracing::error!(?err, "No se pudo contar tokens administrados");
+    let tokens = state.tokens.list().await.map_err(|err| {
+        tracing::error!(?err, "No se pudieron listar tokens administrados");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+    let expiring_window = Duration::hours(24);
+    let expiring_token_count = tokens
+        .iter()
+        .filter(|token| expires_within(token, expiring_window))
+        .count();
+    let scopes_catalog = tokens
+        .iter()
+        .flat_map(|token| token.scopes.iter().cloned())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
 
     Ok(Json(SecurityReloadResponse {
         auth_enabled: snapshot.auth_enabled,
         admin_token_present: snapshot.admin_token_present,
         static_token_count: snapshot.static_token_count,
-        managed_token_count: managed.max(0) as u64,
+        managed_token_count: snapshot.managed_token_count.max(0) as u64,
+        expiring_token_count: expiring_token_count as u64,
+        scopes_catalog,
     }))
 }
 
@@ -434,7 +449,7 @@ async fn events_stream(
 
     Sse::new(stream).keep_alive(
         KeepAlive::new()
-            .interval(Duration::from_secs(10))
+            .interval(StdDuration::from_secs(10))
             .text("keep-alive"),
     )
 }
@@ -442,6 +457,8 @@ async fn events_stream(
 #[derive(Deserialize)]
 struct CreateTokenRequest {
     name: String,
+    scopes: Option<Vec<String>>,
+    expires_at: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -464,20 +481,30 @@ async fn create_api_token(
     State(state): State<AppState>,
     Json(payload): Json<CreateTokenRequest>,
 ) -> Result<(StatusCode, Json<CreateTokenResponse>), (StatusCode, String)> {
-    if payload.name.trim().is_empty() {
+    let CreateTokenRequest {
+        name,
+        scopes,
+        expires_at,
+    } = payload;
+
+    if name.trim().is_empty() {
         return Err((StatusCode::BAD_REQUEST, "El nombre es obligatorio".into()));
     }
 
-    let issued = state
-        .tokens
-        .issue(payload.name.trim().to_string())
-        .await
-        .map_err(|err| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("No se pudo emitir token: {err}"),
-            )
-        })?;
+    let scopes = scopes.unwrap_or_else(|| vec!["containers:read".into(), "tasks:read".into()]);
+    let expires_at = parse_expiration(expires_at)?;
+    let spec = TokenSpec {
+        name: name.trim().to_string(),
+        scopes,
+        expires_at,
+    };
+
+    let issued = state.tokens.issue(spec).await.map_err(|err| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("No se pudo emitir token: {err}"),
+        )
+    })?;
 
     let response = CreateTokenResponse {
         token: issued.secret,
@@ -496,4 +523,41 @@ async fn revoke_api_token(Path(token_id): Path<Uuid>, State(state): State<AppSta
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }
+}
+
+fn parse_expiration(raw: Option<String>) -> Result<Option<OffsetDateTime>, (StatusCode, String)> {
+    match raw {
+        Some(value) => {
+            let parsed = OffsetDateTime::parse(&value, &Rfc3339).map_err(|_| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    "expires_at debe seguir el formato RFC3339".into(),
+                )
+            })?;
+            if parsed <= OffsetDateTime::now_utc() {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "expires_at debe ser una fecha futura".into(),
+                ));
+            }
+            Ok(Some(parsed))
+        }
+        None => Ok(None),
+    }
+}
+
+fn expires_within(token: &ApiTokenInfo, window: Duration) -> bool {
+    token
+        .expires_at
+        .as_deref()
+        .and_then(parse_rfc3339_timestamp)
+        .map(|expires| {
+            let now = OffsetDateTime::now_utc();
+            expires > now && expires <= now + window
+        })
+        .unwrap_or(false)
+}
+
+fn parse_rfc3339_timestamp(value: &str) -> Option<OffsetDateTime> {
+    OffsetDateTime::parse(value, &Rfc3339).ok()
 }

@@ -10,6 +10,8 @@ Name | Type
 `adminTokenPresent` | boolean
 `staticTokenCount` | number
 `managedTokenCount` | number
+`expiringTokenCount` | number
+`scopesCatalog` | Array&lt;string&gt;
 
 ## Example
 
@@ -22,6 +24,8 @@ const example = {
   "adminTokenPresent": null,
   "staticTokenCount": null,
   "managedTokenCount": null,
+  "expiringTokenCount": null,
+  "scopesCatalog": null,
 } satisfies SecurityStatus
 
 console.log(example)

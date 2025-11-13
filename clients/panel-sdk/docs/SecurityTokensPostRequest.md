@@ -7,6 +7,8 @@
 Name | Type
 ------------ | -------------
 `name` | string
+`scopes` | Array&lt;string&gt;
+`expiresAt` | Date
 
 ## Example
 
@@ -16,6 +18,8 @@ import type { SecurityTokensPostRequest } from '@orbit/panel-sdk'
 // TODO: Update the object below with actual values
 const example = {
   "name": null,
+  "scopes": null,
+  "expiresAt": null,
 } satisfies SecurityTokensPostRequest
 
 console.log(example)

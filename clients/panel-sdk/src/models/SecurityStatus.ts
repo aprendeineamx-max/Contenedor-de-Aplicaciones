@@ -43,6 +43,18 @@ export interface SecurityStatus {
      * @memberof SecurityStatus
      */
     managedTokenCount: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof SecurityStatus
+     */
+    expiringTokenCount: number;
+    /**
+     * 
+     * @type {Array<string>}
+     * @memberof SecurityStatus
+     */
+    scopesCatalog: Array<string>;
 }
 
 /**
@@ -53,6 +65,8 @@ export function instanceOfSecurityStatus(value: object): value is SecurityStatus
     if (!('adminTokenPresent' in value) || value['adminTokenPresent'] === undefined) return false;
     if (!('staticTokenCount' in value) || value['staticTokenCount'] === undefined) return false;
     if (!('managedTokenCount' in value) || value['managedTokenCount'] === undefined) return false;
+    if (!('expiringTokenCount' in value) || value['expiringTokenCount'] === undefined) return false;
+    if (!('scopesCatalog' in value) || value['scopesCatalog'] === undefined) return false;
     return true;
 }
 
@@ -70,6 +84,8 @@ export function SecurityStatusFromJSONTyped(json: any, ignoreDiscriminator: bool
         'adminTokenPresent': json['admin_token_present'],
         'staticTokenCount': json['static_token_count'],
         'managedTokenCount': json['managed_token_count'],
+        'expiringTokenCount': json['expiring_token_count'],
+        'scopesCatalog': json['scopes_catalog'],
     };
 }
 
@@ -88,6 +104,8 @@ export function SecurityStatusToJSONTyped(value?: SecurityStatus | null, ignoreD
         'admin_token_present': value['adminTokenPresent'],
         'static_token_count': value['staticTokenCount'],
         'managed_token_count': value['managedTokenCount'],
+        'expiring_token_count': value['expiringTokenCount'],
+        'scopes_catalog': value['scopesCatalog'],
     };
 }
 

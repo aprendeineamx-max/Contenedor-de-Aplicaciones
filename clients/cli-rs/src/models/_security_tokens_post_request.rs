@@ -16,12 +16,20 @@ pub struct SecurityTokensPostRequest {
     /// Etiqueta descriptiva del token
     #[serde(rename = "name")]
     pub name: String,
+    /// Lista de scopes (p.e. `containers:read`, `tasks:write`). VacA�o = sin privilegios adicionales.
+    #[serde(rename = "scopes", skip_serializing_if = "Option::is_none")]
+    pub scopes: Option<Vec<String>>,
+    /// Fecha de expiraciA3n en formato RFC3339 (opcional)
+    #[serde(rename = "expires_at", skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>,
 }
 
 impl SecurityTokensPostRequest {
     pub fn new(name: String) -> SecurityTokensPostRequest {
         SecurityTokensPostRequest {
             name,
+            scopes: None,
+            expires_at: None,
         }
     }
 }

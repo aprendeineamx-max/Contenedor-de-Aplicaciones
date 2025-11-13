@@ -19,8 +19,14 @@ pub struct ApiToken {
     pub name: String,
     #[serde(rename = "prefix")]
     pub prefix: String,
+    #[serde(rename = "scopes", skip_serializing_if = "Option::is_none")]
+    pub scopes: Option<Vec<String>>,
     #[serde(rename = "created_at")]
     pub created_at: String,
+    #[serde(rename = "expires_at", skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>,
+    #[serde(rename = "last_used_at", skip_serializing_if = "Option::is_none")]
+    pub last_used_at: Option<String>,
     #[serde(rename = "revoked_at", skip_serializing_if = "Option::is_none")]
     pub revoked_at: Option<String>,
 }
@@ -31,7 +37,10 @@ impl ApiToken {
             id,
             name,
             prefix,
+            scopes: None,
             created_at,
+            expires_at: None,
+            last_used_at: None,
             revoked_at: None,
         }
     }

@@ -1,10 +1,11 @@
 use anyhow::Result;
 use serde_json;
 use sqlx::{
-    Row, SqlitePool,
+    Error as SqlxError, Row, SqlitePool,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
 use std::{path::Path, str::FromStr};
+use time::OffsetDateTime;
 use tokio::fs;
 use uuid::Uuid;
 
@@ -106,7 +107,10 @@ impl SqliteStore {
                 name TEXT NOT NULL,
                 hash TEXT NOT NULL,
                 prefix TEXT NOT NULL,
+                scopes TEXT NOT NULL,
                 created_at TEXT NOT NULL,
+                expires_at TEXT,
+                last_used_at TEXT,
                 revoked_at TEXT
             );
             "#,
@@ -114,7 +118,25 @@ impl SqliteStore {
         .execute(&pool)
         .await?;
 
+        Self::ensure_token_columns(&pool).await?;
+
         Ok(Self { pool })
+    }
+
+    async fn ensure_token_columns(pool: &SqlitePool) -> Result<()> {
+        Self::add_column_if_missing(pool, "scopes TEXT NOT NULL DEFAULT '[]'").await?;
+        Self::add_column_if_missing(pool, "expires_at TEXT").await?;
+        Self::add_column_if_missing(pool, "last_used_at TEXT").await?;
+        Ok(())
+    }
+
+    async fn add_column_if_missing(pool: &SqlitePool, definition: &str) -> Result<()> {
+        let statement = format!("ALTER TABLE api_tokens ADD COLUMN {definition};");
+        match sqlx::query(&statement).execute(pool).await {
+            Ok(_) => Ok(()),
+            Err(err) if is_duplicate_column_error(&err) => Ok(()),
+            Err(err) => Err(err.into()),
+        }
     }
 
     pub async fn upsert_container(&self, container: &ContainerModel) -> Result<()> {
@@ -367,28 +389,35 @@ impl SqliteStore {
     pub async fn create_api_token(
         &self,
         name: String,
+        scopes: Vec<String>,
         hash: String,
         prefix: String,
+        expires_at: Option<String>,
     ) -> Result<ApiTokenInfo> {
         let info = ApiTokenInfo {
             id: Uuid::new_v4(),
             name,
             prefix,
+            scopes,
             created_at: now_timestamp(),
+            expires_at,
+            last_used_at: None,
             revoked_at: None,
         };
 
         sqlx::query(
             r#"
-            INSERT INTO api_tokens (id, name, hash, prefix, created_at)
-            VALUES (?1, ?2, ?3, ?4, ?5);
+            INSERT INTO api_tokens (id, name, hash, prefix, scopes, created_at, expires_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);
             "#,
         )
         .bind(info.id.to_string())
         .bind(&info.name)
         .bind(hash)
         .bind(&info.prefix)
+        .bind(serde_json::to_string(&info.scopes)?)
         .bind(&info.created_at)
+        .bind(&info.expires_at)
         .execute(&self.pool)
         .await?;
 
@@ -398,7 +427,7 @@ impl SqliteStore {
     pub async fn list_api_tokens(&self) -> Result<Vec<ApiTokenInfo>> {
         let rows = sqlx::query(
             r#"
-            SELECT id, name, prefix, created_at, revoked_at
+            SELECT id, name, prefix, scopes, created_at, expires_at, last_used_at, revoked_at
             FROM api_tokens
             ORDER BY datetime(created_at) DESC;
             "#,
@@ -408,12 +437,19 @@ impl SqliteStore {
 
         Ok(rows
             .into_iter()
-            .map(|row| ApiTokenInfo {
-                id: Uuid::parse_str(row.get::<String, _>("id").as_str()).unwrap(),
-                name: row.get("name"),
-                prefix: row.get("prefix"),
-                created_at: row.get("created_at"),
-                revoked_at: row.get("revoked_at"),
+            .filter_map(|row| {
+                let scopes_json: String = row.get("scopes");
+                let scopes = serde_json::from_str(&scopes_json).ok()?;
+                Some(ApiTokenInfo {
+                    id: Uuid::parse_str(row.get::<String, _>("id").as_str()).ok()?,
+                    name: row.get("name"),
+                    prefix: row.get("prefix"),
+                    scopes,
+                    created_at: row.get("created_at"),
+                    expires_at: row.get("expires_at"),
+                    last_used_at: row.get("last_used_at"),
+                    revoked_at: row.get("revoked_at"),
+                })
             })
             .collect())
     }
@@ -434,29 +470,73 @@ impl SqliteStore {
         Ok(result.rows_affected() > 0)
     }
 
-    pub async fn verify_api_token_hash(&self, hash: &str) -> Result<bool> {
-        let exists = sqlx::query_scalar::<_, i64>(
+    pub async fn resolve_api_token(&self, hash: &str) -> Result<Option<ApiTokenInfo>> {
+        let row = sqlx::query(
             r#"
-            SELECT 1 FROM api_tokens
+            SELECT id, name, prefix, scopes, created_at, expires_at, last_used_at
+            FROM api_tokens
             WHERE hash = ?1 AND revoked_at IS NULL
             LIMIT 1;
             "#,
         )
         .bind(hash)
         .fetch_optional(&self.pool)
-        .await?
-        .is_some();
+        .await?;
 
-        Ok(exists)
+        let Some(row) = row else {
+            return Ok(None);
+        };
+
+        let expires_at: Option<String> = row.get("expires_at");
+        if let Some(expiration) = &expires_at {
+            if let Some(expires) = parse_timestamp(expiration) {
+                if expires <= OffsetDateTime::now_utc() {
+                    return Ok(None);
+                }
+            }
+        }
+
+        let scopes_json: String = row.get("scopes");
+        let scopes: Vec<String> = serde_json::from_str(&scopes_json).unwrap_or_default();
+
+        let mut info = ApiTokenInfo {
+            id: Uuid::parse_str(row.get::<String, _>("id").as_str()).unwrap(),
+            name: row.get("name"),
+            prefix: row.get("prefix"),
+            scopes,
+            created_at: row.get("created_at"),
+            expires_at,
+            last_used_at: row.get("last_used_at"),
+            revoked_at: None,
+        };
+
+        let last_used = now_timestamp();
+        sqlx::query(
+            r#"
+            UPDATE api_tokens
+            SET last_used_at = ?2
+            WHERE id = ?1;
+            "#,
+        )
+        .bind(info.id.to_string())
+        .bind(&last_used)
+        .execute(&self.pool)
+        .await?;
+        info.last_used_at = Some(last_used);
+
+        Ok(Some(info))
     }
 
     pub async fn count_active_tokens(&self) -> Result<i64> {
+        let now = now_timestamp();
         let count = sqlx::query_scalar::<_, i64>(
             r#"
             SELECT COUNT(1) FROM api_tokens
-            WHERE revoked_at IS NULL;
+            WHERE revoked_at IS NULL
+              AND (expires_at IS NULL OR expires_at > ?1);
             "#,
         )
+        .bind(now)
         .fetch_one(&self.pool)
         .await?;
 
@@ -525,4 +605,15 @@ fn now_timestamp() -> String {
 
 fn normalize_sqlite_path(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
+}
+
+fn is_duplicate_column_error(err: &SqlxError) -> bool {
+    matches!(
+        err,
+        SqlxError::Database(db_err) if db_err.message().contains("duplicate column name")
+    )
+}
+
+fn parse_timestamp(value: &str) -> Option<OffsetDateTime> {
+    OffsetDateTime::parse(value, &time::format_description::well_known::Rfc3339).ok()
 }

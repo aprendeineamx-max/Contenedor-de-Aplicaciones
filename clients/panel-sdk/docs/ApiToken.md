@@ -9,7 +9,10 @@ Name | Type
 `id` | string
 `name` | string
 `prefix` | string
+`scopes` | Array&lt;string&gt;
 `createdAt` | Date
+`expiresAt` | Date
+`lastUsedAt` | Date
 `revokedAt` | Date
 
 ## Example
@@ -22,7 +25,10 @@ const example = {
   "id": null,
   "name": null,
   "prefix": null,
+  "scopes": null,
   "createdAt": null,
+  "expiresAt": null,
+  "lastUsedAt": null,
   "revokedAt": null,
 } satisfies ApiToken
 

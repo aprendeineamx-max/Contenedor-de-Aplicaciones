@@ -21,15 +21,21 @@ pub struct SecurityStatus {
     pub static_token_count: i32,
     #[serde(rename = "managed_token_count")]
     pub managed_token_count: i32,
+    #[serde(rename = "expiring_token_count")]
+    pub expiring_token_count: i32,
+    #[serde(rename = "scopes_catalog")]
+    pub scopes_catalog: Vec<String>,
 }
 
 impl SecurityStatus {
-    pub fn new(auth_enabled: bool, admin_token_present: bool, static_token_count: i32, managed_token_count: i32) -> SecurityStatus {
+    pub fn new(auth_enabled: bool, admin_token_present: bool, static_token_count: i32, managed_token_count: i32, expiring_token_count: i32, scopes_catalog: Vec<String>) -> SecurityStatus {
         SecurityStatus {
             auth_enabled,
             admin_token_present,
             static_token_count,
             managed_token_count,
+            expiring_token_count,
+            scopes_catalog,
         }
     }
 }

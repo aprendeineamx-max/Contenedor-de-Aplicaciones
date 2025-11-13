@@ -25,6 +25,18 @@ export interface SecurityTokensPostRequest {
      * @memberof SecurityTokensPostRequest
      */
     name: string;
+    /**
+     * Lista de scopes (p.e. `containers:read`, `tasks:write`). VacA�o = sin privilegios adicionales.
+     * @type {Array<string>}
+     * @memberof SecurityTokensPostRequest
+     */
+    scopes?: Array<string>;
+    /**
+     * Fecha de expiraciA3n en formato RFC3339 (opcional)
+     * @type {Date}
+     * @memberof SecurityTokensPostRequest
+     */
+    expiresAt?: Date;
 }
 
 /**
@@ -46,6 +58,8 @@ export function SecurityTokensPostRequestFromJSONTyped(json: any, ignoreDiscrimi
     return {
         
         'name': json['name'],
+        'scopes': json['scopes'] == null ? undefined : json['scopes'],
+        'expiresAt': json['expires_at'] == null ? undefined : (new Date(json['expires_at'])),
     };
 }
 
@@ -61,6 +75,8 @@ export function SecurityTokensPostRequestToJSONTyped(value?: SecurityTokensPostR
     return {
         
         'name': value['name'],
+        'scopes': value['scopes'],
+        'expires_at': value['expiresAt'] == null ? value['expiresAt'] : value['expiresAt'].toISOString(),
     };
 }
 
