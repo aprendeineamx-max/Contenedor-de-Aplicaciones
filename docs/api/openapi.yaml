@@ -171,6 +171,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Task'
   /containers/{containerId}/apps:
+    parameters:
+      - name: containerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
     get:
       tags: [Apps]
       summary: Listar apps dentro de un contenedor
@@ -232,6 +239,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Task'
   /containers/{containerId}/snapshots:
+    parameters:
+      - name: containerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
     get:
       tags: [Snapshots]
       summary: Listar snapshots

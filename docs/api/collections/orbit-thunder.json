@@ -1,0 +1,98 @@
+{
+  "client": "Thunder Client",
+  "collectionName": "Orbit Agent API",
+  "dateExported": "2025-11-13T04:36:00Z",
+  "version": "1.1",
+  "folders": [],
+  "requests": [
+    {
+      "name": "GET Containers",
+      "method": "GET",
+      "url": "{{baseUrl}}/containers",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        }
+      ],
+      "params": [],
+      "body": {},
+      "tests": []
+    },
+    {
+      "name": "POST Container",
+      "method": "POST",
+      "url": "{{baseUrl}}/containers",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"name\": \"test-container\",\n  \"platform\": \"windows-x64\"\n}"
+      },
+      "tests": []
+    },
+    {
+      "name": "POST Install App",
+      "method": "POST",
+      "url": "{{baseUrl}}/containers/{{containerId}}/apps",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "body": {
+        "type": "json",
+        "raw": "{\n  \"installer_path\": \"C:\\\\Installers\\\\app.exe\",\n  \"name\": \"Test App\"\n}"
+      },
+      "tests": []
+    },
+    {
+      "name": "GET Task Status",
+      "method": "GET",
+      "url": "{{baseUrl}}/tasks/{{taskId}}",
+      "headers": [
+        {
+          "name": "Authorization",
+          "value": "Bearer {{token}}"
+        }
+      ],
+      "tests": []
+    }
+  ],
+  "env": [
+    {
+      "name": "local",
+      "variables": [
+        {
+          "name": "baseUrl",
+          "value": "https://localhost:7443/api"
+        },
+        {
+          "name": "token",
+          "value": "replace-me"
+        },
+        {
+          "name": "containerId",
+          "value": "00000000-0000-0000-0000-000000000000"
+        },
+        {
+          "name": "taskId",
+          "value": "00000000-0000-0000-0000-000000000000"
+        }
+      ]
+    }
+  ]
+}

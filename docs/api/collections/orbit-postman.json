@@ -1,0 +1,167 @@
+{
+  "info": {
+    "name": "Orbit Agent API",
+    "_postman_id": "2e6bb4c9-8fb0-4b41-9e3f-d9b134ff2c02",
+    "description": "Colección base para interactuar con el agente Orbit desde Postman.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Listar contenedores",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/containers",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "containers"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Crear contenedor",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"chrome-beta\",\n  \"description\": \"Contenedor QA\",\n  \"platform\": \"windows-x64\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/containers",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "containers"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Instalar app en contenedor",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"installer_path\": \"C:\\\\Installers\\\\chrome_beta.exe\",\n  \"silent_args\": \"--do-not-launch\",\n  \"name\": \"Chrome Beta\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/containers/{{containerId}}/apps",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "containers",
+            "{{containerId}}",
+            "apps"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Crear snapshot",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"label\": \"post-install\",\n  \"type\": \"full\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/containers/{{containerId}}/snapshots",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "containers",
+            "{{containerId}}",
+            "snapshots"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Consultar tarea",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/tasks/{{taskId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "tasks",
+            "{{taskId}}"
+          ]
+        }
+      }
+    }
+  ],
+  "event": [],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://localhost:7443/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "replace-me",
+      "type": "string"
+    },
+    {
+      "key": "containerId",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "type": "string"
+    },
+    {
+      "key": "taskId",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "type": "string"
+    }
+  ]
+}
