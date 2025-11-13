@@ -7,6 +7,7 @@ pub struct AgentConfig {
     pub containers_root: PathBuf,
     pub telemetry_level: String,
     pub api_bind: SocketAddr,
+    pub database_path: PathBuf,
 }
 
 impl AgentConfig {
@@ -22,10 +23,15 @@ impl AgentConfig {
             .parse()
             .expect("ORBIT_API_BIND debe tener formato ip:puerto");
 
+        let database_path = std::env::var("ORBIT_DB_PATH")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| PathBuf::from("orbit-data/agent.db"));
+
         Self {
             containers_root,
             telemetry_level,
             api_bind,
+            database_path,
         }
     }
 }

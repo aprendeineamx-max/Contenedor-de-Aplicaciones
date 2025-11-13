@@ -7,16 +7,32 @@ pub use registry::RegistryLayer;
 pub use runtime::{ProcessLauncher, RuntimeEnv};
 
 use anyhow::Result;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Platform {
     WindowsX64,
     WindowsArm64,
+}
+
+impl Platform {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Platform::WindowsX64 => "windows-x64",
+            Platform::WindowsArm64 => "windows-arm64",
+        }
+    }
+
+    pub fn from_str(value: &str) -> Self {
+        match value {
+            "windows-arm64" => Platform::WindowsArm64,
+            _ => Platform::WindowsX64,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

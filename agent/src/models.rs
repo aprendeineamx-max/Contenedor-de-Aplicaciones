@@ -13,7 +13,29 @@ pub enum ContainerStatus {
     Archived,
 }
 
-#[derive(Clone, Serialize)]
+impl ContainerStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ContainerStatus::Creating => "creating",
+            ContainerStatus::Ready => "ready",
+            ContainerStatus::Running => "running",
+            ContainerStatus::Error => "error",
+            ContainerStatus::Archived => "archived",
+        }
+    }
+
+    pub fn from_str(value: &str) -> Self {
+        match value {
+            "creating" => ContainerStatus::Creating,
+            "running" => ContainerStatus::Running,
+            "error" => ContainerStatus::Error,
+            "archived" => ContainerStatus::Archived,
+            _ => ContainerStatus::Ready,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ContainerModel {
     pub id: Uuid,
     pub name: String,
@@ -57,7 +79,29 @@ pub enum TaskStatus {
     Cancelled,
 }
 
-#[derive(Clone, Serialize)]
+impl TaskStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TaskStatus::Queued => "queued",
+            TaskStatus::Running => "running",
+            TaskStatus::Succeeded => "succeeded",
+            TaskStatus::Failed => "failed",
+            TaskStatus::Cancelled => "cancelled",
+        }
+    }
+
+    pub fn from_str(value: &str) -> Self {
+        match value {
+            "running" => TaskStatus::Running,
+            "succeeded" => TaskStatus::Succeeded,
+            "failed" => TaskStatus::Failed,
+            "cancelled" => TaskStatus::Cancelled,
+            _ => TaskStatus::Queued,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TaskModel {
     pub id: Uuid,
     #[serde(rename = "type")]

@@ -1,21 +1,10 @@
-mod config;
-mod events;
-mod models;
-mod server;
-mod services;
-mod store;
-mod telemetry;
-mod virtualization;
-
+use agent::{
+    config::AgentConfig, events::EventHub, server, server::AppState, services::ContainerService,
+    store::SqliteStore, telemetry, virtualization::Platform,
+};
 use anyhow::Result;
-use config::AgentConfig;
-use events::EventHub;
-use server::AppState;
-use services::ContainerService;
-use store::InMemoryStore;
 use tokio::sync::oneshot;
 use tracing::info;
-use virtualization::Platform;
 
 struct Agent {
     containers: ContainerService,
@@ -27,13 +16,13 @@ impl Agent {
     }
 
     pub async fn bootstrap(&self) -> Result<()> {
-        // Crear un contenedor de demostración para validar el flujo end-to-end.
+        // Crear un contenedor de demostracion para validar el flujo end-to-end.
         let _ = self
             .containers
             .create_container(
                 "chrome-poc".into(),
                 Platform::WindowsX64,
-                Some("Contenedor de demostración inicial".into()),
+                Some("Contenedor de demostracion inicial".into()),
             )
             .await?;
         Ok(())
@@ -51,7 +40,7 @@ async fn main() -> Result<()> {
     );
 
     let events = EventHub::new(128);
-    let store = InMemoryStore::new();
+    let store = SqliteStore::new(&config.database_path).await?;
     let container_service = ContainerService::new(config.clone(), events.clone(), store.clone());
 
     let agent = Agent::new(container_service.clone());
@@ -73,7 +62,7 @@ async fn main() -> Result<()> {
 
     info!("PoC lista. API disponible en {}", config.api_bind);
     tokio::signal::ctrl_c().await?;
-    info!("Señal de apagado recibida, cerrando agente.");
+    info!("Senal de apagado recibida, cerrando agente.");
     let _ = shutdown_tx.send(());
     let _ = server_handle.await;
     Ok(())

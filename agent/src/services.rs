@@ -7,7 +7,7 @@ use crate::{
     config::AgentConfig,
     events::{AgentEvent, EventHub},
     models::{ContainerModel, TaskModel, TaskStatus},
-    store::InMemoryStore,
+    store::SqliteStore,
     virtualization::{Platform, SandboxDescriptor, SandboxRuntime},
 };
 
@@ -19,12 +19,12 @@ pub struct ContainerService {
 struct ContainerServiceInner {
     config: AgentConfig,
     events: EventHub,
-    store: InMemoryStore,
+    store: SqliteStore,
     mutex: Mutex<()>,
 }
 
 impl ContainerService {
-    pub fn new(config: AgentConfig, events: EventHub, store: InMemoryStore) -> Self {
+    pub fn new(config: AgentConfig, events: EventHub, store: SqliteStore) -> Self {
         Self {
             inner: Arc::new(ContainerServiceInner {
                 config,
@@ -45,7 +45,7 @@ impl ContainerService {
 
         let mut task = TaskModel::new("container.create").with_status(TaskStatus::Running);
         task.set_progress(5, Some("Inicializando creación".to_string()));
-        self.inner.store.upsert_task(task.clone()).await;
+        self.inner.store.upsert_task(&task).await?;
         self.inner.events.emit(AgentEvent::TaskCreated {
             id: task.id,
             task_type: task.task_type.clone(),
@@ -63,11 +63,11 @@ impl ContainerService {
             .await
             .context("No se pudo preparar el filesystem del contenedor")
         {
-            self.fail_task(task.clone(), err.to_string()).await;
+            self.fail_task(task, err.to_string()).await?;
             return Err(err);
         }
         task.set_progress(40, Some("Filesystem y registro preparados".to_string()));
-        self.inner.store.upsert_task(task.clone()).await;
+        self.inner.store.upsert_task(&task).await?;
         self.inner.events.emit(AgentEvent::TaskProgress {
             id: task.id,
             progress: 40,
@@ -79,11 +79,11 @@ impl ContainerService {
             .await
             .context("No se pudo persistir el manifest del contenedor")
         {
-            self.fail_task(task.clone(), err.to_string()).await;
+            self.fail_task(task, err.to_string()).await?;
             return Err(err);
         }
         task.set_progress(80, Some("Manifest generado".to_string()));
-        self.inner.store.upsert_task(task.clone()).await;
+        self.inner.store.upsert_task(&task).await?;
         self.inner.events.emit(AgentEvent::TaskProgress {
             id: task.id,
             progress: 80,
@@ -94,11 +94,11 @@ impl ContainerService {
         let mut container =
             ContainerModel::new(descriptor.container_id, name.clone(), description, platform);
         container.touch();
-        self.inner.store.upsert_container(container.clone()).await;
+        self.inner.store.upsert_container(&container).await?;
 
         task.status = TaskStatus::Succeeded;
         task.set_progress(100, Some("Contenedor listo".to_string()));
-        self.inner.store.upsert_task(task.clone()).await;
+        self.inner.store.upsert_task(&task).await?;
         self.inner.events.emit(AgentEvent::TaskProgress {
             id: task.id,
             progress: 100,
@@ -112,10 +112,10 @@ impl ContainerService {
         Ok(task)
     }
 
-    pub async fn fail_task(&self, mut task: TaskModel, error: String) -> TaskModel {
+    pub async fn fail_task(&self, mut task: TaskModel, error: String) -> Result<TaskModel> {
         task.status = TaskStatus::Failed;
         task.set_progress(task.progress, Some(error));
-        self.inner.store.upsert_task(task.clone()).await;
-        task
+        self.inner.store.upsert_task(&task).await?;
+        Ok(task)
     }
 }

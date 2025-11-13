@@ -9,6 +9,7 @@ axum = { version = "0.7", features = ["macros", "json"] }
 futures-core = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio-rustls", "macros", "sqlite"] }
 thiserror = "1.0"
 tokio = { version = "1.40", features = ["rt-multi-thread", "macros", "signal", "fs"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
@@ -16,3 +17,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 uuid = { version = "1.11", features = ["serde", "v4"] }
 time = { version = "0.3", features = ["macros", "formatting"] }
+
+[dev-dependencies]
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+tempfile = "3.10"

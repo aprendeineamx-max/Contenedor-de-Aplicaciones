@@ -19,7 +19,7 @@ use crate::{
     events::EventHub,
     models::{ContainerModel, TaskModel},
     services::ContainerService,
-    store::InMemoryStore,
+    store::SqliteStore,
     virtualization::Platform,
 };
 use time::OffsetDateTime;
@@ -28,7 +28,7 @@ use time::OffsetDateTime;
 pub struct AppState {
     pub config: AgentConfig,
     pub events: EventHub,
-    pub store: InMemoryStore,
+    pub store: SqliteStore,
     pub containers: ContainerService,
     pub started_at: OffsetDateTime,
 }
@@ -37,7 +37,7 @@ impl AppState {
     pub fn new(
         config: AgentConfig,
         events: EventHub,
-        store: InMemoryStore,
+        store: SqliteStore,
         containers: ContainerService,
     ) -> Self {
         Self {
@@ -119,9 +119,18 @@ async fn events_stream(
     )
 }
 
-async fn list_containers(State(state): State<AppState>) -> Json<Vec<ContainerModel>> {
-    let containers = state.store.list_containers().await;
-    Json(containers)
+async fn list_containers(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<ContainerModel>>, StatusCode> {
+    state
+        .store
+        .list_containers()
+        .await
+        .map(Json)
+        .map_err(|err| {
+            tracing::error!(?err, "No se pudieron listar los contenedores");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
 }
 
 async fn create_container(
@@ -142,21 +151,23 @@ async fn create_container(
         })
 }
 
-async fn list_tasks(State(state): State<AppState>) -> Json<Vec<TaskModel>> {
-    let tasks = state.store.list_tasks().await;
-    Json(tasks)
+async fn list_tasks(State(state): State<AppState>) -> Result<Json<Vec<TaskModel>>, StatusCode> {
+    state.store.list_tasks().await.map(Json).map_err(|err| {
+        tracing::error!(?err, "No se pudieron listar las tareas");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })
 }
 
 async fn task_detail(
     Path(task_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<TaskModel>, StatusCode> {
-    state
-        .store
-        .get_task(task_id)
-        .await
-        .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+    let result = state.store.get_task(task_id).await.map_err(|err| {
+        tracing::error!(?err, "No se pudo consultar la tarea");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    result.map(Json).ok_or(StatusCode::NOT_FOUND)
 }
 
 #[derive(Deserialize)]
