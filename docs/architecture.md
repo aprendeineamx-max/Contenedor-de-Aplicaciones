@@ -82,6 +82,7 @@ Containers/
 - Las variables de entorno siguen teniendo prioridad para credenciales y rutas sensibles ("ORBIT_ADMIN_TOKEN", "ORBIT_DB_PATH", etc.).
 - Se expondran endpoints /system/config (solo lectura admin) y /system/security/reload (hot reload existente) para aplicar cambios sin reiniciar.
 - Los tokens de servicio incluyen scopes, expiracion y "last_used_at", preparando la futura interfaz para auditoria y control de permisos.
+- QA puede inspeccionar rapidamente el entorno ejecutando `npm run inspect-config` (SDK TypeScript) o `cargo run --example system_config` dentro de `clients/cli-rs` (SDK Rust).
 ## Observabilidad
 - Logging estructurado vía OpenTelemetry + `tracing` crate.  
 - Métricas expuestas en `/metrics` (Prometheus).  

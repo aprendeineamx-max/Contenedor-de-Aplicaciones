@@ -111,10 +111,6 @@ impl AuthManager {
             }
         }
     }
-
-    pub async fn is_authorized(&self, header: Option<&str>) -> bool {
-        self.authorize(header).await.is_some()
-    }
 }
 
 fn parse_bearer(header: &str) -> Option<String> {
@@ -133,18 +129,22 @@ pub fn hash_token(token: &str) -> String {
 
 pub async fn auth_middleware(
     State(manager): State<AuthManager>,
-    req: Request<Body>,
+    mut req: Request<Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    if manager.enabled().await {
+    let context = if manager.enabled().await {
         let header = req
             .headers()
             .get(axum::http::header::AUTHORIZATION)
             .and_then(|value| value.to_str().ok());
-        if !manager.is_authorized(header).await {
-            return Err(StatusCode::UNAUTHORIZED);
+        match manager.authorize(header).await {
+            Some(ctx) => ctx,
+            None => return Err(StatusCode::UNAUTHORIZED),
         }
-    }
+    } else {
+        AuthContext::Admin
+    };
 
+    req.extensions_mut().insert(context);
     Ok(next.run(req).await)
 }

@@ -3,8 +3,8 @@ use std::{collections::BTreeSet, convert::Infallible, time::Duration as StdDurat
 use anyhow::Result;
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode},
+    extract::{Extension, Path, Query, State},
+    http::StatusCode,
     middleware::from_fn_with_state,
     response::sse::{Event, KeepAlive, Sse},
     routing::{delete, get, post},
@@ -25,6 +25,10 @@ use crate::{
     virtualization::Platform,
 };
 use time::{Duration, OffsetDateTime, format_description::well_known::Rfc3339};
+
+const SCOPE_CONTAINERS_READ: &str = "containers:read";
+const SCOPE_CONTAINERS_WRITE: &str = "containers:write";
+const SCOPE_TASKS_READ: &str = "tasks:read";
 
 #[derive(Clone)]
 pub struct AppState {
@@ -123,10 +127,10 @@ async fn system_info(State(state): State<AppState>) -> Json<SystemInfo> {
 }
 
 async fn system_config(
+    Extension(ctx): Extension<AuthContext>,
     State(state): State<AppState>,
-    headers: HeaderMap,
 ) -> Result<Json<ConfigResponse>, StatusCode> {
-    require_admin(&state.auth, &headers).await?;
+    ensure_admin(&ctx)?;
     let config_snapshot = state.config.snapshot();
     let security_snapshot = state.auth.snapshot().await;
     let tokens = state.tokens.list().await.map_err(|err| {
@@ -169,8 +173,10 @@ struct SecurityReloadResponse {
 }
 
 async fn reload_security(
+    Extension(ctx): Extension<AuthContext>,
     State(state): State<AppState>,
 ) -> Result<Json<SecurityReloadResponse>, StatusCode> {
+    ensure_admin(&ctx)?;
     let latest = SecurityConfig::from_env();
     state.auth.reload(latest).await;
     let snapshot = state.auth.snapshot().await;
@@ -189,9 +195,11 @@ struct ContainersQuery {
 }
 
 async fn list_containers(
+    Extension(ctx): Extension<AuthContext>,
     Query(params): Query<ContainersQuery>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ContainerModel>>, StatusCode> {
+    ensure_scope(&ctx, SCOPE_CONTAINERS_READ)?;
     state
         .store
         .list_containers(params.status.map(|s| s.to_lowercase()))
@@ -211,9 +219,11 @@ struct CreateContainerRequest {
 }
 
 async fn create_container(
+    Extension(ctx): Extension<AuthContext>,
     State(state): State<AppState>,
     Json(payload): Json<CreateContainerRequest>,
 ) -> Result<Json<TaskModel>, (StatusCode, String)> {
+    ensure_scope(&ctx, SCOPE_CONTAINERS_WRITE).map_err(forbidden_with_message)?;
     let platform = Platform::from_str(&payload.platform);
     state
         .containers
@@ -229,9 +239,11 @@ async fn create_container(
 }
 
 async fn get_container(
+    Extension(ctx): Extension<AuthContext>,
     Path(container_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<ContainerModel>, StatusCode> {
+    ensure_scope(&ctx, SCOPE_CONTAINERS_READ)?;
     state
         .containers
         .get_container(container_id)
@@ -245,9 +257,11 @@ async fn get_container(
 }
 
 async fn delete_container(
+    Extension(ctx): Extension<AuthContext>,
     Path(container_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<TaskModel>, StatusCode> {
+    ensure_scope(&ctx, SCOPE_CONTAINERS_WRITE)?;
     state
         .containers
         .delete_container(container_id)
@@ -269,9 +283,11 @@ struct AppInstallRequest {
 }
 
 async fn list_apps(
+    Extension(ctx): Extension<AuthContext>,
     Path(container_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<AppInstance>>, StatusCode> {
+    ensure_scope(&ctx, SCOPE_CONTAINERS_READ)?;
     state
         .apps
         .list(container_id)
@@ -284,10 +300,12 @@ async fn list_apps(
 }
 
 async fn install_app(
+    Extension(ctx): Extension<AuthContext>,
     Path(container_id): Path<Uuid>,
     State(state): State<AppState>,
     Json(payload): Json<AppInstallRequest>,
 ) -> Result<Json<TaskModel>, (StatusCode, String)> {
+    ensure_scope(&ctx, SCOPE_CONTAINERS_WRITE).map_err(forbidden_with_message)?;
     let AppInstallRequest {
         name,
         version,
@@ -318,10 +336,12 @@ struct LaunchAppRequest {
 }
 
 async fn launch_app(
+    Extension(ctx): Extension<AuthContext>,
     Path(app_id): Path<Uuid>,
     State(state): State<AppState>,
     Json(payload): Json<LaunchAppRequest>,
 ) -> Result<Json<TaskModel>, StatusCode> {
+    ensure_scope(&ctx, SCOPE_CONTAINERS_WRITE)?;
     let _ = (payload.entry_point_id, payload.args);
     state
         .apps
@@ -344,9 +364,11 @@ struct SnapshotRequest {
 }
 
 async fn list_snapshots(
+    Extension(ctx): Extension<AuthContext>,
     Path(container_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Snapshot>>, StatusCode> {
+    ensure_scope(&ctx, SCOPE_CONTAINERS_READ)?;
     state
         .snapshots
         .list(container_id)
@@ -359,10 +381,12 @@ async fn list_snapshots(
 }
 
 async fn create_snapshot(
+    Extension(ctx): Extension<AuthContext>,
     Path(container_id): Path<Uuid>,
     State(state): State<AppState>,
     Json(payload): Json<SnapshotRequest>,
 ) -> Result<Json<TaskModel>, (StatusCode, String)> {
+    ensure_scope(&ctx, SCOPE_CONTAINERS_WRITE).map_err(forbidden_with_message)?;
     let SnapshotRequest {
         label,
         snapshot_type,
@@ -386,9 +410,11 @@ async fn create_snapshot(
 }
 
 async fn restore_snapshot(
+    Extension(ctx): Extension<AuthContext>,
     Path(snapshot_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<TaskModel>, StatusCode> {
+    ensure_scope(&ctx, SCOPE_CONTAINERS_WRITE)?;
     state
         .snapshots
         .restore(snapshot_id)
@@ -408,9 +434,11 @@ struct TasksQuery {
 }
 
 async fn list_tasks(
+    Extension(ctx): Extension<AuthContext>,
     Query(params): Query<TasksQuery>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<TaskModel>>, StatusCode> {
+    ensure_scope(&ctx, SCOPE_TASKS_READ)?;
     state
         .store
         .list_tasks(
@@ -426,9 +454,11 @@ async fn list_tasks(
 }
 
 async fn task_detail(
+    Extension(ctx): Extension<AuthContext>,
     Path(task_id): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<TaskModel>, StatusCode> {
+    ensure_scope(&ctx, SCOPE_TASKS_READ)?;
     state
         .store
         .get_task(task_id)
@@ -442,8 +472,10 @@ async fn task_detail(
 }
 
 async fn events_stream(
+    Extension(ctx): Extension<AuthContext>,
     State(state): State<AppState>,
-) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, StatusCode> {
+    ensure_scope(&ctx, SCOPE_TASKS_READ)?;
     let rx = state.events.subscribe();
     let stream = BroadcastStream::new(rx).filter_map(|event| match event {
         Ok(envelope) => match serde_json::to_string(&envelope) {
@@ -459,11 +491,11 @@ async fn events_stream(
         }
     });
 
-    Sse::new(stream).keep_alive(
+    Ok(Sse::new(stream).keep_alive(
         KeepAlive::new()
             .interval(StdDuration::from_secs(10))
             .text("keep-alive"),
-    )
+    ))
 }
 
 #[derive(Deserialize)]
@@ -481,8 +513,10 @@ struct CreateTokenResponse {
 }
 
 async fn list_api_tokens(
+    Extension(ctx): Extension<AuthContext>,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ApiTokenInfo>>, StatusCode> {
+    ensure_admin(&ctx)?;
     state.tokens.list().await.map(Json).map_err(|err| {
         tracing::error!(?err, "No se pudieron listar tokens");
         StatusCode::INTERNAL_SERVER_ERROR
@@ -490,9 +524,11 @@ async fn list_api_tokens(
 }
 
 async fn create_api_token(
+    Extension(ctx): Extension<AuthContext>,
     State(state): State<AppState>,
     Json(payload): Json<CreateTokenRequest>,
 ) -> Result<(StatusCode, Json<CreateTokenResponse>), (StatusCode, String)> {
+    ensure_admin(&ctx).map_err(forbidden_with_message)?;
     let CreateTokenRequest {
         name,
         scopes,
@@ -526,7 +562,14 @@ async fn create_api_token(
     Ok((StatusCode::CREATED, Json(response)))
 }
 
-async fn revoke_api_token(Path(token_id): Path<Uuid>, State(state): State<AppState>) -> StatusCode {
+async fn revoke_api_token(
+    Extension(ctx): Extension<AuthContext>,
+    Path(token_id): Path<Uuid>,
+    State(state): State<AppState>,
+) -> StatusCode {
+    if let Err(status) = ensure_admin(&ctx) {
+        return status;
+    }
     match state.tokens.revoke(token_id).await {
         Ok(true) => StatusCode::NO_CONTENT,
         Ok(false) => StatusCode::NOT_FOUND,
@@ -535,6 +578,35 @@ async fn revoke_api_token(Path(token_id): Path<Uuid>, State(state): State<AppSta
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }
+}
+
+fn ensure_admin(ctx: &AuthContext) -> Result<(), StatusCode> {
+    match ctx {
+        AuthContext::Admin | AuthContext::StaticToken { .. } => Ok(()),
+        AuthContext::ServiceToken { .. } => Err(StatusCode::FORBIDDEN),
+    }
+}
+
+fn ensure_scope(ctx: &AuthContext, scope: &str) -> Result<(), StatusCode> {
+    if has_scope(ctx, scope) {
+        Ok(())
+    } else {
+        Err(StatusCode::FORBIDDEN)
+    }
+}
+
+fn has_scope(ctx: &AuthContext, scope: &str) -> bool {
+    match ctx {
+        AuthContext::Admin | AuthContext::StaticToken { .. } => true,
+        AuthContext::ServiceToken { token } => token.scopes.iter().any(|s| s == scope),
+    }
+}
+
+fn forbidden_with_message(status: StatusCode) -> (StatusCode, String) {
+    (
+        status,
+        "Permisos insuficientes para la operacion solicitada".into(),
+    )
 }
 
 fn parse_expiration(raw: Option<String>) -> Result<Option<OffsetDateTime>, (StatusCode, String)> {
@@ -572,17 +644,6 @@ fn expires_within(token: &ApiTokenInfo, window: Duration) -> bool {
 
 fn parse_rfc3339_timestamp(value: &str) -> Option<OffsetDateTime> {
     OffsetDateTime::parse(value, &Rfc3339).ok()
-}
-
-async fn require_admin(auth: &AuthManager, headers: &HeaderMap) -> Result<(), StatusCode> {
-    let header = headers
-        .get(axum::http::header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok());
-    match auth.authorize(header).await {
-        Some(AuthContext::Admin) => Ok(()),
-        Some(_) => Err(StatusCode::FORBIDDEN),
-        None => Err(StatusCode::UNAUTHORIZED),
-    }
 }
 
 fn build_security_response(

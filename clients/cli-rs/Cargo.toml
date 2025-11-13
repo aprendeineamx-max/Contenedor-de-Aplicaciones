@@ -19,3 +19,6 @@ reqwest = { version = "^0.12", default-features = false, features = ["json", "mu
 default = ["native-tls"]
 native-tls = ["reqwest/native-tls"]
 rustls-tls = ["reqwest/rustls-tls"]
+
+[dev-dependencies]
+tokio = { version = "1.40", features = ["macros", "rt-multi-thread"] }

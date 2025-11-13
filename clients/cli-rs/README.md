@@ -75,7 +75,18 @@ To get access to the crate's generated documentation, use:
 cargo doc --open
 ```
 
-## Author
+## Ejemplo rapido: consultar `/system/config`
 
+El SDK incluye un ejemplo asA-ncrono que imprime el snapshot de configuracion para QA:
+
+```
+ORBIT_BASE_URL=http://127.0.0.1:7443 \
+ORBIT_ADMIN_TOKEN=<token-admin> \
+cargo run --example system_config --features rustls-tls
+```
+
+Tambien puedes usar `--features native-tls` si prefieres las librerias TLS de Windows.
+
+## Author
 
 

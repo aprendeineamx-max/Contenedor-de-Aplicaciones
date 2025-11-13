@@ -290,6 +290,111 @@ async fn system_config_requires_admin() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
+async fn scoped_tokens_limit_permissions() -> anyhow::Result<()> {
+    let temp = TempDir::new()?;
+    let port = next_port();
+    let bind = SocketAddr::from(([127, 0, 0, 1], port));
+
+    let config = AgentConfig {
+        containers_root: temp.path().join("containers"),
+        telemetry_level: "info".into(),
+        api_bind: bind,
+        database_path: temp.path().join("agent.db"),
+        security: SecurityConfig {
+            auth_enabled: true,
+            admin_token: Some("root-token".into()),
+            api_tokens: vec![],
+        },
+    };
+
+    let events = EventHub::new(32);
+    let store = SqliteStore::new(&config.database_path).await?;
+    let containers = ContainerService::new(config.clone(), events.clone(), store.clone());
+    let apps = AppService::new(events.clone(), store.clone());
+    let snapshots = SnapshotService::new(events.clone(), store.clone());
+    let tokens = TokenService::new(store.clone());
+    let auth = AuthManager::new(config.security.clone(), store.clone());
+    let state = AppState::new(
+        config.clone(),
+        events.clone(),
+        store.clone(),
+        containers.clone(),
+        apps.clone(),
+        snapshots.clone(),
+        tokens.clone(),
+        auth,
+    );
+
+    let (tx, rx) = oneshot::channel();
+    let server_handle = tokio::spawn(async move { server::serve(state, rx).await });
+    tokio::time::sleep(StdDuration::from_millis(200)).await;
+
+    let client = Client::new();
+    let base = format!("http://{}", config.api_bind);
+
+    // Token solo lectura
+    let read_only = client
+        .post(format!("{base}/security/tokens"))
+        .header("Authorization", "Bearer root-token")
+        .json(&serde_json::json!({
+            "name": "reader",
+            "scopes": ["containers:read"]
+        }))
+        .send()
+        .await?;
+    assert_eq!(read_only.status(), StatusCode::CREATED);
+    let read_body: serde_json::Value = read_only.json().await?;
+    let read_token = read_body
+        .get("token")
+        .and_then(|v| v.as_str())
+        .unwrap()
+        .to_string();
+
+    let list_status = client
+        .get(format!("{base}/containers"))
+        .header("Authorization", format!("Bearer {read_token}"))
+        .send()
+        .await?
+        .status();
+    assert!(list_status.is_success());
+
+    let create_forbidden = client
+        .post(format!("{base}/containers"))
+        .header("Authorization", format!("Bearer {read_token}"))
+        .json(&serde_json::json!({ "name": "ro", "platform": "windows-x64" }))
+        .send()
+        .await?
+        .status();
+    assert_eq!(create_forbidden, StatusCode::FORBIDDEN);
+
+    // Token con permisos de escritura
+    let writer = client
+        .post(format!("{base}/security/tokens"))
+        .header("Authorization", "Bearer root-token")
+        .json(&serde_json::json!({
+            "name": "writer",
+            "scopes": ["containers:read", "containers:write"]
+        }))
+        .send()
+        .await?;
+    assert_eq!(writer.status(), StatusCode::CREATED);
+    let writer_body: serde_json::Value = writer.json().await?;
+    let writer_token = writer_body.get("token").and_then(|v| v.as_str()).unwrap();
+
+    let writer_create = client
+        .post(format!("{base}/containers"))
+        .header("Authorization", format!("Bearer {writer_token}"))
+        .json(&serde_json::json!({ "name": "rw", "platform": "windows-x64" }))
+        .send()
+        .await?;
+    assert!(writer_create.status().is_success());
+
+    let _ = tx.send(());
+    let _ = server_handle.await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn service_tokens_flow_and_reload() -> anyhow::Result<()> {
     let temp = TempDir::new()?;
     let port = next_port();

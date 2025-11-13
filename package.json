@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "regenerate-sdks": "node scripts/regenerate-sdks.mjs",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "inspect-config": "node scripts/inspect-config.mjs"
   },
   "devDependencies": {
     "@openapitools/openapi-generator-cli": "2.25.0"

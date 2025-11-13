@@ -57,3 +57,7 @@ Cada token de servicio puede declararse con un conjunto de scopes (`containers:r
 ### Pruebas end-to-end rapidas
 
 Ejecuta `npm run smoke` desde la raiz para lanzar el agente temporalmente (con `cargo run`), emitir un token via SDK TypeScript, crear un contenedor y validar que la API responde. El script usa el SDK generado en `clients/panel-sdk` y simula el camino panel → API, por lo que es ideal antes de integrar una UI real.
+
+### Inspeccion rapida del entorno
+- **Panel SDK**: `ORBIT_BASE_URL=http://127.0.0.1:7443 ORBIT_ADMIN_TOKEN=<token> npm run inspect-config` mostrara el snapshot de configuracion y las fuentes aplicadas.
+- **CLI SDK**: `cd clients/cli-rs && ORBIT_BASE_URL=http://127.0.0.1:7443 ORBIT_ADMIN_TOKEN=<token> cargo run --example system_config --features rustls-tls` (o `--features native-tls`) imprime el mismo snapshot usando el SDK Rust.
