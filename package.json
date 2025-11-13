@@ -1,0 +1,12 @@
+{
+  "name": "orbit-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "regenerate-sdks": "node scripts/regenerate-sdks.mjs"
+  },
+  "devDependencies": {
+    "@openapitools/openapi-generator-cli": "2.25.0"
+  }
+}

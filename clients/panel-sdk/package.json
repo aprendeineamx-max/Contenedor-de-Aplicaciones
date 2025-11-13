@@ -2,18 +2,10 @@
   "name": "@orbit/panel-sdk",
   "version": "0.1.0",
   "description": "OpenAPI client for @orbit/panel-sdk",
-  "author": "Orbit Platform",
+  "author": "OpenAPI-Generator",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aprendeineamx-max/Contenedor-de-Aplicaciones.git"
-  },
-  "homepage": "https://github.com/aprendeineamx-max/Contenedor-de-Aplicaciones#readme",
-  "bugs": {
-    "url": "https://github.com/aprendeineamx-max/Contenedor-de-Aplicaciones/issues"
-  },
-  "license": "MIT",
-  "publishConfig": {
-    "access": "restricted"
+    "url": "https://github.com/GIT_USER_ID/GIT_REPO_ID.git"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -2,22 +2,17 @@
 
 ## SDK TypeScript (`clients/panel-sdk`)
 
-1. Instalar dependencias y compilar:
+1. Ejecuta la automatización completa:
    ```bash
-   cd clients/panel-sdk
-   npm install
-   npm run build
+   npm run regenerate-sdks
    ```
-2. Empaquetar:
-   ```bash
-   npm pack
-   ```
-   El archivo `.tgz` se copia a `artifacts/` para facilitar la publicación manual.
-3. Publicar en un registry privado/npm (requiere `npm login` configurado):
+   Este comando regenera ambos clientes (TS + Rust), instala dependencias, ejecuta la compilación y
+   copia el `.tgz` resultante a `artifacts/`.
+2. Publicar en un registry privado/npm (requiere `npm login` configurado):
    ```bash
    npm publish artifacts/orbit-panel-sdk-0.1.0.tgz --tag beta
    ```
-4. Consumir desde un proyecto React/Next:
+3. Consumir desde un proyecto React/Next:
    ```bash
    npm install @orbit/panel-sdk@beta
    ```
@@ -43,7 +38,7 @@ Se recomienda fijar `rev = "1884d14"` (o el commit deseado) para builds reproduc
 
 ## Checklist antes de liberar una versión
 - [ ] Actualizar `docs/api/openapi.yaml`.
-- [ ] Regenerar clientes (`npm run regenerate-sdks` cuando exista script).
+- [x] Regenerar clientes (`npm run regenerate-sdks`).
 - [ ] Ejecutar `npm pack` y subir el tarball al registry/npm.
 - [ ] Asegurar que el commit de referencia está etiquetado (`git tag sdk-v0.1.0`).
 - [ ] Actualizar este documento con la nueva versión del paquete.

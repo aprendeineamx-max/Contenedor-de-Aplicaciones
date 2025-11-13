@@ -1,63 +1,41 @@
 mod config;
 mod events;
+mod models;
 mod server;
+mod services;
+mod store;
 mod telemetry;
 mod virtualization;
 
 use anyhow::Result;
 use config::AgentConfig;
-use events::{AgentEvent, EventHub};
+use events::EventHub;
 use server::AppState;
+use services::ContainerService;
+use store::InMemoryStore;
 use tokio::sync::oneshot;
-use tracing::{info, instrument};
-use virtualization::{Platform, SandboxDescriptor, SandboxRuntime};
+use tracing::info;
+use virtualization::Platform;
 
 struct Agent {
-    config: AgentConfig,
-    events: EventHub,
+    containers: ContainerService,
 }
 
 impl Agent {
-    pub fn new(config: AgentConfig, events: EventHub) -> Self {
-        Self { config, events }
+    pub fn new(containers: ContainerService) -> Self {
+        Self { containers }
     }
 
-    #[instrument(skip(self))]
     pub async fn bootstrap(&self) -> Result<()> {
-        tokio::fs::create_dir_all(&self.config.containers_root).await?;
-
-        let descriptor = SandboxDescriptor::new(
-            "chrome-poc",
-            Platform::WindowsX64,
-            self.config.containers_root.join("chrome-poc"),
-        );
-        let task_id = descriptor.container_id;
-        self.events.emit(AgentEvent::TaskCreated {
-            id: task_id,
-            task_type: "container.create".into(),
-            status: "running".into(),
-        });
-
-        let sandbox = SandboxRuntime::new(descriptor);
-        sandbox.prepare().await?;
-        self.events.emit(AgentEvent::TaskProgress {
-            id: task_id,
-            progress: 45,
-            message: "Filesystem/registry preparados".into(),
-        });
-
-        sandbox.persist_manifest().await?;
-        self.events.emit(AgentEvent::TaskProgress {
-            id: task_id,
-            progress: 90,
-            message: "Manifest creado".into(),
-        });
-
-        self.events.emit(AgentEvent::ContainerStatus {
-            container_id: task_id,
-            status: "ready".into(),
-        });
-
+        // Crear un contenedor de demostración para validar el flujo end-to-end.
+        let _ = self
+            .containers
+            .create_container(
+                "chrome-poc".into(),
+                Platform::WindowsX64,
+                Some("Contenedor de demostración inicial".into()),
+            )
+            .await?;
         Ok(())
     }
 }
@@ -73,8 +51,16 @@ async fn main() -> Result<()> {
     );
 
     let events = EventHub::new(128);
-    let agent = Agent::new(config.clone(), events.clone());
-    let app_state = AppState::new(config.clone(), events.clone());
+    let store = InMemoryStore::new();
+    let container_service = ContainerService::new(config.clone(), events.clone(), store.clone());
+
+    let agent = Agent::new(container_service.clone());
+    let app_state = AppState::new(
+        config.clone(),
+        events.clone(),
+        store.clone(),
+        container_service.clone(),
+    );
 
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
     let server_handle = tokio::spawn(async move {
