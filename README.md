@@ -48,6 +48,12 @@ Los tokens emitidos se almacenan en la tabla `api_tokens` con hash SHA-256 y los
 
 Cada token de servicio puede declararse con un conjunto de scopes (`containers:read`, `containers:write`, `tasks:read`, etc.) y una fecha de expiracion RFC3339. El agente persiste `scopes`, `expires_at` y `last_used_at` para que la UI pueda mostrar reglas de acceso, advertir sobre caducidades y preparar una futura capa de permisos granulares. El endpoint `/system/security/reload` ahora devuelve un resumen (`managed_token_count`, `expiring_token_count`, `scopes_catalog`) para poblar dashboards y alertas.
 
+## Configuracion centralizada
+
+- Define los valores por defecto en `config/orbit.toml` y, opcionalmente, crea un `orbit-data/config.local.toml` ignorado por git para ajustes por entorno.
+- Las variables de entorno siguen teniendo prioridad; el endpoint `GET /system/config` (requiere token admin) muestra el snapshot resultante y las fuentes que se aplicaron.
+- `POST /system/security/reload` recarga los tokens estaticos/env sin reiniciar el proceso; futuros endpoints `/system/config/reload` reutilizaran la misma base.
+
 ### Pruebas end-to-end rapidas
 
 Ejecuta `npm run smoke` desde la raiz para lanzar el agente temporalmente (con `cargo run`), emitir un token via SDK TypeScript, crear un contenedor y validar que la API responde. El script usa el SDK generado en `clients/panel-sdk` y simula el camino panel → API, por lo que es ideal antes de integrar una UI real.

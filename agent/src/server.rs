@@ -4,7 +4,7 @@ use anyhow::Result;
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     middleware::from_fn_with_state,
     response::sse::{Event, KeepAlive, Sse},
     routing::{delete, get, post},
@@ -16,10 +16,10 @@ use tokio_stream::{StreamExt, wrappers::BroadcastStream};
 use uuid::Uuid;
 
 use crate::{
-    config::{AgentConfig, SecurityConfig},
+    config::{self, AgentConfig, ConfigSnapshot, ConfigSourcesView, SecurityConfig},
     events::EventHub,
     models::{ApiTokenInfo, AppInstance, ContainerModel, Snapshot, SnapshotType, TaskModel},
-    security::{AuthManager, auth_middleware},
+    security::{AuthContext, AuthManager, SecuritySnapshot, auth_middleware},
     services::{AppService, ContainerService, SnapshotService, TokenService, TokenSpec},
     store::SqliteStore,
     virtualization::Platform,
@@ -67,6 +67,7 @@ impl AppState {
 pub async fn serve(state: AppState, shutdown: oneshot::Receiver<()>) -> Result<()> {
     let app = Router::new()
         .route("/system/info", get(system_info))
+        .route("/system/config", get(system_config))
         .route("/system/security/reload", post(reload_security))
         .route("/containers", get(list_containers).post(create_container))
         .route(
@@ -121,12 +122,40 @@ async fn system_info(State(state): State<AppState>) -> Json<SystemInfo> {
     })
 }
 
+async fn system_config(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<ConfigResponse>, StatusCode> {
+    require_admin(&state.auth, &headers).await?;
+    let config_snapshot = state.config.snapshot();
+    let security_snapshot = state.auth.snapshot().await;
+    let tokens = state.tokens.list().await.map_err(|err| {
+        tracing::error!(?err, "No se pudieron listar tokens administrados");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let sources = config::config_sources_view();
+    let security_view = build_security_response(&security_snapshot, &tokens);
+
+    Ok(Json(ConfigResponse {
+        config: config_snapshot,
+        security: security_view,
+        sources,
+    }))
+}
+
 #[derive(Serialize)]
 struct SystemInfo {
     version: String,
     build: String,
     uptime_seconds: u64,
     driver_status: String,
+}
+
+#[derive(Serialize)]
+struct ConfigResponse {
+    config: ConfigSnapshot,
+    security: SecurityReloadResponse,
+    sources: ConfigSourcesView,
 }
 
 #[derive(Serialize)]
@@ -149,26 +178,9 @@ async fn reload_security(
         tracing::error!(?err, "No se pudieron listar tokens administrados");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    let expiring_window = Duration::hours(24);
-    let expiring_token_count = tokens
-        .iter()
-        .filter(|token| expires_within(token, expiring_window))
-        .count();
-    let scopes_catalog = tokens
-        .iter()
-        .flat_map(|token| token.scopes.iter().cloned())
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect();
+    let response = build_security_response(&snapshot, &tokens);
 
-    Ok(Json(SecurityReloadResponse {
-        auth_enabled: snapshot.auth_enabled,
-        admin_token_present: snapshot.admin_token_present,
-        static_token_count: snapshot.static_token_count,
-        managed_token_count: snapshot.managed_token_count.max(0) as u64,
-        expiring_token_count: expiring_token_count as u64,
-        scopes_catalog,
-    }))
+    Ok(Json(response))
 }
 
 #[derive(Deserialize)]
@@ -560,4 +572,41 @@ fn expires_within(token: &ApiTokenInfo, window: Duration) -> bool {
 
 fn parse_rfc3339_timestamp(value: &str) -> Option<OffsetDateTime> {
     OffsetDateTime::parse(value, &Rfc3339).ok()
+}
+
+async fn require_admin(auth: &AuthManager, headers: &HeaderMap) -> Result<(), StatusCode> {
+    let header = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok());
+    match auth.authorize(header).await {
+        Some(AuthContext::Admin) => Ok(()),
+        Some(_) => Err(StatusCode::FORBIDDEN),
+        None => Err(StatusCode::UNAUTHORIZED),
+    }
+}
+
+fn build_security_response(
+    snapshot: &SecuritySnapshot,
+    tokens: &[ApiTokenInfo],
+) -> SecurityReloadResponse {
+    let expiring_window = Duration::hours(24);
+    let expiring_token_count = tokens
+        .iter()
+        .filter(|token| expires_within(token, expiring_window))
+        .count();
+    let scopes_catalog = tokens
+        .iter()
+        .flat_map(|token| token.scopes.iter().cloned())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+
+    SecurityReloadResponse {
+        auth_enabled: snapshot.auth_enabled,
+        admin_token_present: snapshot.admin_token_present,
+        static_token_count: snapshot.static_token_count,
+        managed_token_count: snapshot.managed_token_count.max(0) as u64,
+        expiring_token_count: expiring_token_count as u64,
+        scopes_catalog,
+    }
 }

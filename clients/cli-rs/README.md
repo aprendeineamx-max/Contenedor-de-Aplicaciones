@@ -41,6 +41,7 @@ Class | Method | HTTP request | Description
 *SnapshotsApi* | [**containers_container_id_snapshots_get**](docs/SnapshotsApi.md#containers_container_id_snapshots_get) | **GET** /containers/{containerId}/snapshots | Listar snapshots
 *SnapshotsApi* | [**containers_container_id_snapshots_post**](docs/SnapshotsApi.md#containers_container_id_snapshots_post) | **POST** /containers/{containerId}/snapshots | Crear snapshot
 *SnapshotsApi* | [**snapshots_snapshot_id_restore_post**](docs/SnapshotsApi.md#snapshots_snapshot_id_restore_post) | **POST** /snapshots/{snapshotId}/restore | Restaurar snapshot
+*SystemApi* | [**system_config_get**](docs/SystemApi.md#system_config_get) | **GET** /system/config | Snapshot de configuraciA3n efectiva (solo admins)
 *SystemApi* | [**system_info_get**](docs/SystemApi.md#system_info_get) | **GET** /system/info | Información del agente
 *TasksApi* | [**tasks_get**](docs/TasksApi.md#tasks_get) | **GET** /tasks | Listar tareas
 *TasksApi* | [**tasks_task_id_get**](docs/TasksApi.md#tasks_task_id_get) | **GET** /tasks/{taskId} | Estado de tarea
@@ -53,6 +54,10 @@ Class | Method | HTTP request | Description
  - [AppInstance](docs/AppInstance.md)
  - [AppInstanceEntryPointsInner](docs/AppInstanceEntryPointsInner.md)
  - [AppsAppIdLaunchPostRequest](docs/AppsAppIdLaunchPostRequest.md)
+ - [ConfigResponse](docs/ConfigResponse.md)
+ - [ConfigSecurity](docs/ConfigSecurity.md)
+ - [ConfigSnapshot](docs/ConfigSnapshot.md)
+ - [ConfigSources](docs/ConfigSources.md)
  - [Container](docs/Container.md)
  - [ContainersContainerIdAppsPostRequest](docs/ContainersContainerIdAppsPostRequest.md)
  - [ContainersContainerIdSnapshotsPostRequest](docs/ContainersContainerIdSnapshotsPostRequest.md)

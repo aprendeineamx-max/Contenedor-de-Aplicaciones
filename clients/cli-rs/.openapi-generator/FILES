@@ -8,6 +8,10 @@ docs/AppInstance.md
 docs/AppInstanceEntryPointsInner.md
 docs/AppsApi.md
 docs/AppsAppIdLaunchPostRequest.md
+docs/ConfigResponse.md
+docs/ConfigSecurity.md
+docs/ConfigSnapshot.md
+docs/ConfigSources.md
 docs/Container.md
 docs/ContainersApi.md
 docs/ContainersContainerIdAppsPostRequest.md
@@ -42,6 +46,10 @@ src/models/api_token.rs
 src/models/api_token_created.rs
 src/models/app_instance.rs
 src/models/app_instance_entry_points_inner.rs
+src/models/config_response.rs
+src/models/config_security.rs
+src/models/config_snapshot.rs
+src/models/config_sources.rs
 src/models/container.rs
 src/models/mod.rs
 src/models/security_status.rs

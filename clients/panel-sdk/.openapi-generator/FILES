@@ -7,6 +7,10 @@ docs/AppInstance.md
 docs/AppInstanceEntryPointsInner.md
 docs/AppsApi.md
 docs/AppsAppIdLaunchPostRequest.md
+docs/ConfigResponse.md
+docs/ConfigSecurity.md
+docs/ConfigSnapshot.md
+docs/ConfigSources.md
 docs/Container.md
 docs/ContainersApi.md
 docs/ContainersContainerIdAppsPostRequest.md
@@ -35,6 +39,10 @@ src/models/ApiTokenCreated.ts
 src/models/AppInstance.ts
 src/models/AppInstanceEntryPointsInner.ts
 src/models/AppsAppIdLaunchPostRequest.ts
+src/models/ConfigResponse.ts
+src/models/ConfigSecurity.ts
+src/models/ConfigSnapshot.ts
+src/models/ConfigSources.ts
 src/models/Container.ts
 src/models/ContainersContainerIdAppsPostRequest.ts
 src/models/ContainersContainerIdSnapshotsPostRequest.ts

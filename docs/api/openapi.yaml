@@ -150,6 +150,38 @@ components:
         scopes_catalog:
           type: array
           items: { type: string }
+    ConfigSecurity:
+      type: object
+      properties:
+        auth_enabled: { type: boolean }
+        admin_token_present: { type: boolean }
+        static_tokens: { type: integer }
+    ConfigSnapshot:
+      type: object
+      properties:
+        containers_root: { type: string }
+        telemetry_level: { type: string }
+        api_bind: { type: string }
+        database_path: { type: string }
+        security:
+          $ref: '#/components/schemas/ConfigSecurity'
+    ConfigSources:
+      type: object
+      properties:
+        defaults_file: { type: string, nullable: true }
+        local_file: { type: string, nullable: true }
+        env_overrides:
+          type: array
+          items: { type: string }
+    ConfigResponse:
+      type: object
+      properties:
+        config:
+          $ref: '#/components/schemas/ConfigSnapshot'
+        security:
+          $ref: '#/components/schemas/SecurityStatus'
+        sources:
+          $ref: '#/components/schemas/ConfigSources'
 paths:
   /containers:
     get:
@@ -406,6 +438,17 @@ paths:
                   build: { type: string }
                   uptime_seconds: { type: integer }
                   driver_status: { type: string }
+  /system/config:
+    get:
+      tags: [System]
+      summary: Snapshot de configuraciA3n efectiva (solo admins)
+      responses:
+        '200':
+          description: ConfiguraciA3n resultante y fuentes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigResponse'
   /system/security/reload:
     post:
       tags: [Security]
@@ -478,3 +521,5 @@ paths:
           description: Token inexistente
 security:
   - bearerAuth: []
+
+

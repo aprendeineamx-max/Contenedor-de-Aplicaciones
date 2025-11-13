@@ -218,6 +218,78 @@ async fn auth_rejects_without_token() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
+async fn system_config_requires_admin() -> anyhow::Result<()> {
+    let temp = TempDir::new()?;
+    let port = next_port();
+
+    let config = AgentConfig {
+        containers_root: temp.path().join("containers"),
+        telemetry_level: "debug".into(),
+        api_bind: SocketAddr::from(([127, 0, 0, 1], port)),
+        database_path: temp.path().join("agent.db"),
+        security: SecurityConfig {
+            auth_enabled: true,
+            admin_token: Some("root-token".into()),
+            api_tokens: vec!["readonly".into()],
+        },
+    };
+
+    let events = EventHub::new(8);
+    let store = SqliteStore::new(&config.database_path).await?;
+    let containers = ContainerService::new(config.clone(), events.clone(), store.clone());
+    let apps = AppService::new(events.clone(), store.clone());
+    let snapshots = SnapshotService::new(events.clone(), store.clone());
+    let tokens = TokenService::new(store.clone());
+    let auth = AuthManager::new(config.security.clone(), store.clone());
+    let state = AppState::new(
+        config.clone(),
+        events.clone(),
+        store.clone(),
+        containers.clone(),
+        apps.clone(),
+        snapshots.clone(),
+        tokens.clone(),
+        auth,
+    );
+
+    let (tx, rx) = oneshot::channel();
+    let server_handle = tokio::spawn(async move { server::serve(state, rx).await });
+    tokio::time::sleep(StdDuration::from_millis(200)).await;
+
+    let client = Client::new();
+    let base = format!("http://{}", config.api_bind);
+
+    let missing_auth = client.get(format!("{base}/system/config")).send().await?;
+    assert_eq!(missing_auth.status(), StatusCode::UNAUTHORIZED);
+
+    let readonly = client
+        .get(format!("{base}/system/config"))
+        .header("Authorization", "Bearer readonly")
+        .send()
+        .await?;
+    assert_eq!(readonly.status(), StatusCode::FORBIDDEN);
+
+    let admin = client
+        .get(format!("{base}/system/config"))
+        .header("Authorization", "Bearer root-token")
+        .send()
+        .await?;
+    assert_eq!(admin.status(), StatusCode::OK);
+    let payload: serde_json::Value = admin.json().await?;
+    assert_eq!(
+        payload
+            .get("config")
+            .and_then(|v| v.get("telemetry_level"))
+            .and_then(|v| v.as_str()),
+        Some("debug")
+    );
+
+    let _ = tx.send(());
+    let _ = server_handle.await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn service_tokens_flow_and_reload() -> anyhow::Result<()> {
     let temp = TempDir::new()?;
     let port = next_port();

@@ -15,9 +15,12 @@
 
 import * as runtime from '../runtime';
 import type {
+  ConfigResponse,
   SystemInfoGet200Response,
 } from '../models/index';
 import {
+    ConfigResponseFromJSON,
+    ConfigResponseToJSON,
     SystemInfoGet200ResponseFromJSON,
     SystemInfoGet200ResponseToJSON,
 } from '../models/index';
@@ -26,6 +29,43 @@ import {
  * 
  */
 export class SystemApi extends runtime.BaseAPI {
+
+    /**
+     * Snapshot de configuraciA3n efectiva (solo admins)
+     */
+    async systemConfigGetRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<ConfigResponse>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
+
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
+
+        let urlPath = `/system/config`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => ConfigResponseFromJSON(jsonValue));
+    }
+
+    /**
+     * Snapshot de configuraciA3n efectiva (solo admins)
+     */
+    async systemConfigGet(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<ConfigResponse> {
+        const response = await this.systemConfigGetRaw(initOverrides);
+        return await response.value();
+    }
 
     /**
      * Información del agente

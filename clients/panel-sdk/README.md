@@ -70,6 +70,7 @@ All URIs are relative to *https://localhost:7443/api*
 *SnapshotsApi* | [**containersContainerIdSnapshotsGet**](docs/SnapshotsApi.md#containerscontaineridsnapshotsget) | **GET** /containers/{containerId}/snapshots | Listar snapshots
 *SnapshotsApi* | [**containersContainerIdSnapshotsPost**](docs/SnapshotsApi.md#containerscontaineridsnapshotspostoperation) | **POST** /containers/{containerId}/snapshots | Crear snapshot
 *SnapshotsApi* | [**snapshotsSnapshotIdRestorePost**](docs/SnapshotsApi.md#snapshotssnapshotidrestorepost) | **POST** /snapshots/{snapshotId}/restore | Restaurar snapshot
+*SystemApi* | [**systemConfigGet**](docs/SystemApi.md#systemconfigget) | **GET** /system/config | Snapshot de configuraciA3n efectiva (solo admins)
 *SystemApi* | [**systemInfoGet**](docs/SystemApi.md#systeminfoget) | **GET** /system/info | Información del agente
 *TasksApi* | [**tasksGet**](docs/TasksApi.md#tasksget) | **GET** /tasks | Listar tareas
 *TasksApi* | [**tasksTaskIdGet**](docs/TasksApi.md#taskstaskidget) | **GET** /tasks/{taskId} | Estado de tarea
@@ -82,6 +83,10 @@ All URIs are relative to *https://localhost:7443/api*
 - [AppInstance](docs/AppInstance.md)
 - [AppInstanceEntryPointsInner](docs/AppInstanceEntryPointsInner.md)
 - [AppsAppIdLaunchPostRequest](docs/AppsAppIdLaunchPostRequest.md)
+- [ConfigResponse](docs/ConfigResponse.md)
+- [ConfigSecurity](docs/ConfigSecurity.md)
+- [ConfigSnapshot](docs/ConfigSnapshot.md)
+- [ConfigSources](docs/ConfigSources.md)
 - [Container](docs/Container.md)
 - [ContainersContainerIdAppsPostRequest](docs/ContainersContainerIdAppsPostRequest.md)
 - [ContainersContainerIdSnapshotsPostRequest](docs/ContainersContainerIdSnapshotsPostRequest.md)
