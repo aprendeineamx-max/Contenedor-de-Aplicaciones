@@ -25,3 +25,5 @@ Plataforma para ejecutar múltiples aplicaciones de escritorio Windows dentro de
 1. Detallar arquitectura en `docs/architecture.md`, incluyendo diagramas, flujos y decisiones tecnológicas.
 2. Elaborar roadmap con milestones y dependencias.
 3. Preparar PoC de virtualización (Rust + WinFSP/Dokan) antes de construir el stack completo.
+
+\n## Configuracion de seguridad\n- \\ORBIT_AUTH_ENABLED\\: activa el middleware de autenticacion (\\1\\/\\	rue\\).\n- \\ORBIT_ADMIN_TOKEN\\: token Bearer con permisos totales.\n- \\ORBIT_API_TOKENS\\: lista separada por comas (\\	oken1,token2\\).\n\nCuando la autenticacion esta activa, cada request debe enviar \\Authorization: Bearer <token>\\.

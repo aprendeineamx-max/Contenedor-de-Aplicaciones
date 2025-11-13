@@ -1,13 +1,14 @@
 use std::{net::SocketAddr, time::Duration};
 
 use agent::{
-    config::AgentConfig,
+    config::{AgentConfig, SecurityConfig},
     events::EventHub,
+    security::AuthManager,
     server::{self, AppState},
     services::{AppService, ContainerService, SnapshotService},
     store::SqliteStore,
 };
-use reqwest::Client;
+use reqwest::{Client, StatusCode};
 use serde_json;
 use tempfile::TempDir;
 use tokio::sync::oneshot;
@@ -30,6 +31,11 @@ async fn containers_endpoint_creates_tasks() -> anyhow::Result<()> {
         telemetry_level: "info".into(),
         api_bind: SocketAddr::from(([127, 0, 0, 1], port)),
         database_path: temp.path().join("agent.db"),
+        security: SecurityConfig {
+            auth_enabled: false,
+            admin_token: None,
+            api_tokens: vec![],
+        },
     };
 
     let events = EventHub::new(32);
@@ -37,6 +43,7 @@ async fn containers_endpoint_creates_tasks() -> anyhow::Result<()> {
     let containers = ContainerService::new(config.clone(), events.clone(), store.clone());
     let apps = AppService::new(events.clone(), store.clone());
     let snapshots = SnapshotService::new(events.clone(), store.clone());
+    let auth = AuthManager::new(config.security.clone());
     let state = AppState::new(
         config.clone(),
         events.clone(),
@@ -44,6 +51,7 @@ async fn containers_endpoint_creates_tasks() -> anyhow::Result<()> {
         containers.clone(),
         apps.clone(),
         snapshots.clone(),
+        auth,
     );
 
     let (tx, rx) = oneshot::channel();
@@ -123,7 +131,69 @@ async fn containers_endpoint_creates_tasks() -> anyhow::Result<()> {
         ))
         .send()
         .await?;
-    assert_eq!(status.status(), reqwest::StatusCode::NOT_FOUND);
+    assert_eq!(status.status(), StatusCode::NOT_FOUND);
+
+    let _ = tx.send(());
+    let _ = server_handle.await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn auth_rejects_without_token() -> anyhow::Result<()> {
+    let temp = TempDir::new()?;
+    let port = next_port();
+
+    let config = AgentConfig {
+        containers_root: temp.path().join("containers"),
+        telemetry_level: "info".into(),
+        api_bind: SocketAddr::from(([127, 0, 0, 1], port)),
+        database_path: temp.path().join("agent.db"),
+        security: SecurityConfig {
+            auth_enabled: true,
+            admin_token: Some("secret-token".into()),
+            api_tokens: vec![],
+        },
+    };
+
+    let events = EventHub::new(16);
+    let store = SqliteStore::new(&config.database_path).await?;
+    let containers = ContainerService::new(config.clone(), events.clone(), store.clone());
+    let apps = AppService::new(events.clone(), store.clone());
+    let snapshots = SnapshotService::new(events.clone(), store.clone());
+    let auth = AuthManager::new(config.security.clone());
+    let state = AppState::new(
+        config.clone(),
+        events.clone(),
+        store.clone(),
+        containers.clone(),
+        apps.clone(),
+        snapshots.clone(),
+        auth,
+    );
+
+    let (tx, rx) = oneshot::channel();
+    let server_handle = tokio::spawn(async move { server::serve(state, rx).await });
+
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let client = Client::new();
+    let body = serde_json::json!({ "name": "secure-test", "platform": "windows-x64" });
+
+    let unauthorized = client
+        .post(format!("http://{}/containers", config.api_bind))
+        .json(&body)
+        .send()
+        .await?;
+    assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+
+    let authorized = client
+        .post(format!("http://{}/containers", config.api_bind))
+        .header("Authorization", "Bearer secret-token")
+        .json(&body)
+        .send()
+        .await?;
+    assert!(authorized.status().is_success());
 
     let _ = tx.send(());
     let _ = server_handle.await?;

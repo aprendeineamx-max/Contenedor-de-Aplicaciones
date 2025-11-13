@@ -70,6 +70,8 @@ Containers/
 - Dependencias: Rust 1.80+, Node 20 LTS, SQLite 3.45+, NATS (opcional).
 
 ## Seguridad y aislamiento
+- Middleware de autenticacion por token opcional (Bearer) configurable via ORBIT_AUTH_ENABLED/ORBIT_ADMIN_TOKEN.
+
 - Servicio se ejecuta como cuenta dedicada con privilegios limitados; elevaciones se controlan por tarea.  
 - TLS mutuo entre panel y API cuando se expone remotamente.  
 - Sandboxing adicional con Windows Defender Application Control policies para procesos del contenedor.  
@@ -84,4 +86,5 @@ Containers/
 - Hooking debe cubrir APIs Win32 clásicas y .NET (CreateFile/RegSetValue).  
 - Manejar drivers/servicios instalados por la app (advertir limitaciones o usar modo Hyper-V para casos extremos).  
 - Controlar accesos a recursos globales (imágenes COM, servicios) mediante plantillas de permisos.
+
 

@@ -1,6 +1,7 @@
 use agent::{
     config::AgentConfig,
     events::EventHub,
+    security::AuthManager,
     server::{self, AppState},
     services::{AppService, ContainerService, SnapshotService},
     store::SqliteStore,
@@ -48,6 +49,7 @@ async fn main() -> Result<()> {
     let container_service = ContainerService::new(config.clone(), events.clone(), store.clone());
     let app_service = AppService::new(events.clone(), store.clone());
     let snapshot_service = SnapshotService::new(events.clone(), store.clone());
+    let auth_manager = AuthManager::new(config.security.clone());
 
     let agent = Agent::new(container_service.clone());
     let app_state = AppState::new(
@@ -57,6 +59,7 @@ async fn main() -> Result<()> {
         container_service.clone(),
         app_service,
         snapshot_service,
+        auth_manager.clone(),
     );
 
     let (shutdown_tx, shutdown_rx) = oneshot::channel();

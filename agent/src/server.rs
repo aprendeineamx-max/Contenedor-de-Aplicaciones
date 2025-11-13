@@ -5,6 +5,7 @@ use axum::{
     Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
+    middleware::from_fn_with_state,
     response::sse::{Event, KeepAlive, Sse},
     routing::{get, post},
 };
@@ -18,6 +19,7 @@ use crate::{
     config::AgentConfig,
     events::EventHub,
     models::{AppInstance, ContainerModel, Snapshot, SnapshotType, TaskModel},
+    security::{AuthManager, auth_middleware},
     services::{AppService, ContainerService, SnapshotService},
     store::SqliteStore,
     virtualization::Platform,
@@ -32,6 +34,7 @@ pub struct AppState {
     pub containers: ContainerService,
     pub apps: AppService,
     pub snapshots: SnapshotService,
+    pub auth: AuthManager,
     pub started_at: OffsetDateTime,
 }
 
@@ -43,6 +46,7 @@ impl AppState {
         containers: ContainerService,
         apps: AppService,
         snapshots: SnapshotService,
+        auth: AuthManager,
     ) -> Self {
         Self {
             config,
@@ -51,6 +55,7 @@ impl AppState {
             containers,
             apps,
             snapshots,
+            auth,
             started_at: OffsetDateTime::now_utc(),
         }
     }
@@ -77,7 +82,8 @@ pub async fn serve(state: AppState, shutdown: oneshot::Receiver<()>) -> Result<(
         .route("/tasks", get(list_tasks))
         .route("/tasks/:task_id", get(task_detail))
         .route("/events/stream", get(events_stream))
-        .with_state(state.clone());
+        .with_state(state.clone())
+        .layer(from_fn_with_state(state.auth.clone(), auth_middleware));
 
     let listener = TcpListener::bind(state.config.api_bind).await?;
     tracing::info!("API escuchando en {}", state.config.api_bind);
