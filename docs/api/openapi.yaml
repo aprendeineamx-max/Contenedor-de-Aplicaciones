@@ -1,0 +1,345 @@
+openapi: 3.1.0
+info:
+  title: Orbit Container Agent API
+  version: 0.1.0
+  description: >
+    API REST del agente Orbit para gestionar contenedores portables,
+    instalaciones de aplicaciones y tareas asíncronas.
+servers:
+  - url: https://localhost:7443/api
+    description: Endpoint local seguro
+tags:
+  - name: Containers
+  - name: Apps
+  - name: Snapshots
+  - name: Tasks
+  - name: System
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Container:
+      type: object
+      required: [id, name, status, platform, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [creating, ready, running, error, archived]
+        platform:
+          type: string
+          enum: [windows-x64, windows-arm64]
+        tags:
+          type: array
+          items: { type: string }
+        size_bytes:
+          type: integer
+        settings:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AppInstance:
+      type: object
+      required: [id, container_id, name, status]
+      properties:
+        id: { type: string, format: uuid }
+        container_id: { type: string, format: uuid }
+        name: { type: string }
+        version: { type: string }
+        status:
+          type: string
+          enum: [installing, ready, failed, disabled]
+        entry_points:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              label: { type: string }
+              command: { type: string }
+              icon: { type: string }
+        created_at:
+          type: string
+          format: date-time
+    Snapshot:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        container_id: { type: string, format: uuid }
+        label: { type: string }
+        type:
+          type: string
+          enum: [full, delta]
+        base_snapshot_id: { type: string, format: uuid, nullable: true }
+        size_bytes: { type: integer }
+        created_at: { type: string, format: date-time }
+    Task:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string }
+        status:
+          type: string
+          enum: [queued, running, succeeded, failed, cancelled]
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        payload: { type: object }
+        result: { type: object }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+paths:
+  /containers:
+    get:
+      tags: [Containers]
+      summary: Listar contenedores
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Container'
+    post:
+      tags: [Containers]
+      summary: Crear contenedor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, platform]
+              properties:
+                name: { type: string }
+                description: { type: string }
+                platform: { type: string }
+                settings: { type: object }
+      responses:
+        '202':
+          description: Tarea creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /containers/{containerId}:
+    parameters:
+      - name: containerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Containers]
+      summary: Obtener contenedor
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Container'
+        '404':
+          description: No encontrado
+    delete:
+      tags: [Containers]
+      summary: Eliminar contenedor
+      responses:
+        '202':
+          description: Tarea disparada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /containers/{containerId}/apps:
+    get:
+      tags: [Apps]
+      summary: Listar apps dentro de un contenedor
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppInstance'
+    post:
+      tags: [Apps]
+      summary: Instalar app dentro de contenedor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                installer_path: { type: string }
+                silent_args: { type: string }
+                name: { type: string }
+      responses:
+        '202':
+          description: Tarea encolada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /apps/{appId}/launch:
+    post:
+      tags: [Apps]
+      summary: Ejecutar una app
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                entry_point_id: { type: string }
+                args:
+                  type: array
+                  items: { type: string }
+      responses:
+        '202':
+          description: Tarea de lanzamiento creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /containers/{containerId}/snapshots:
+    get:
+      tags: [Snapshots]
+      summary: Listar snapshots
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Snapshot'
+    post:
+      tags: [Snapshots]
+      summary: Crear snapshot
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label: { type: string }
+                type:
+                  type: string
+                  enum: [full, delta]
+                base_snapshot_id:
+                  type: string
+                  format: uuid
+      responses:
+        '202':
+          description: Tarea de snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /snapshots/{snapshotId}/restore:
+    post:
+      tags: [Snapshots]
+      summary: Restaurar snapshot
+      parameters:
+        - name: snapshotId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Restauración en progreso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: Listar tareas
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+  /tasks/{taskId}:
+    parameters:
+      - name: taskId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Tasks]
+      summary: Estado de tarea
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+  /system/info:
+    get:
+      tags: [System]
+      summary: Información del agente
+      responses:
+        '200':
+          description: Info y métricas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: string }
+                  build: { type: string }
+                  uptime_seconds: { type: integer }
+                  driver_status: { type: string }
+security:
+  - bearerAuth: []
