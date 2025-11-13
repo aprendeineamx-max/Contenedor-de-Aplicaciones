@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "agent",
+    "clients/cli-rs"
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"

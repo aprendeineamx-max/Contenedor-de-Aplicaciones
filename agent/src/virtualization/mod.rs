@@ -3,7 +3,7 @@ mod registry;
 mod runtime;
 
 pub use filesystem::{FsLayer, FsSnapshot};
-pub use registry::{RegistryLayer, RegistrySnapshot};
+pub use registry::RegistryLayer;
 pub use runtime::{ProcessLauncher, RuntimeEnv};
 
 use anyhow::Result;

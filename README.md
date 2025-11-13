@@ -8,6 +8,8 @@ Plataforma para ejecutar múltiples aplicaciones de escritorio Windows dentro de
 - Ofrecer control centralizado vía API y panel web responsivo para crear, clonar, exportar y monitorear contenedores.
 - Facilitar pruebas QA con snapshots, reportes y capacidades de scripting.
 
+> Consulta `docs/sdk.md` para el proceso de empaquetado y publicación de los SDKs (TypeScript + Rust).
+
 ## Componentes principales
 1. **Agente Core (Rust)**: servicio Windows con privilegios que crea contenedores, aplica virtualización (filesystem + registro) y expone APIs seguras.
 2. **Capa de Virtualización**: driver WinFSP/Dokan o minifilter propio + hooking de Win32 para redirigir rutas y claves hacia la carpeta del contenedor.
@@ -23,4 +25,3 @@ Plataforma para ejecutar múltiples aplicaciones de escritorio Windows dentro de
 1. Detallar arquitectura en `docs/architecture.md`, incluyendo diagramas, flujos y decisiones tecnológicas.
 2. Elaborar roadmap con milestones y dependencias.
 3. Preparar PoC de virtualización (Rust + WinFSP/Dokan) antes de construir el stack completo.
-

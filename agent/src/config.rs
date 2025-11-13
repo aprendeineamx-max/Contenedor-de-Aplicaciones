@@ -1,12 +1,12 @@
-use std::path::PathBuf;
-
 use serde::Deserialize;
+use std::{net::SocketAddr, path::PathBuf};
 
 /// Configuración básica del agente cargada desde variables de entorno.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AgentConfig {
     pub containers_root: PathBuf,
     pub telemetry_level: String,
+    pub api_bind: SocketAddr,
 }
 
 impl AgentConfig {
@@ -17,9 +17,15 @@ impl AgentConfig {
 
         let telemetry_level = std::env::var("ORBIT_LOG").unwrap_or_else(|_| "info".to_string());
 
+        let api_bind = std::env::var("ORBIT_API_BIND")
+            .unwrap_or_else(|_| "127.0.0.1:7443".to_string())
+            .parse()
+            .expect("ORBIT_API_BIND debe tener formato ip:puerto");
+
         Self {
             containers_root,
             telemetry_level,
+            api_bind,
         }
     }
 }
