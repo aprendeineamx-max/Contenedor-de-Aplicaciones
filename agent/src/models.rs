@@ -143,6 +143,123 @@ impl TaskModel {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Default)]
+pub struct AppEntryPoint {
+    pub id: String,
+    pub label: String,
+    pub command: String,
+    pub icon: Option<String>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AppStatus {
+    Installing,
+    Ready,
+    Failed,
+    Disabled,
+}
+
+impl AppStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AppStatus::Installing => "installing",
+            AppStatus::Ready => "ready",
+            AppStatus::Failed => "failed",
+            AppStatus::Disabled => "disabled",
+        }
+    }
+
+    pub fn from_str(value: &str) -> Self {
+        match value {
+            "installing" => AppStatus::Installing,
+            "failed" => AppStatus::Failed,
+            "disabled" => AppStatus::Disabled,
+            _ => AppStatus::Ready,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct AppInstance {
+    pub id: Uuid,
+    pub container_id: Uuid,
+    pub name: String,
+    pub version: Option<String>,
+    pub status: AppStatus,
+    pub entry_points: Vec<AppEntryPoint>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl AppInstance {
+    pub fn new(container_id: Uuid, name: String, version: Option<String>) -> Self {
+        let timestamp = current_timestamp();
+        Self {
+            id: Uuid::new_v4(),
+            container_id,
+            name,
+            version,
+            status: AppStatus::Ready,
+            entry_points: vec![],
+            created_at: timestamp.clone(),
+            updated_at: timestamp,
+        }
+    }
+
+    pub fn touch(&mut self) {
+        self.updated_at = current_timestamp();
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SnapshotType {
+    Full,
+    Delta,
+}
+
+impl SnapshotType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SnapshotType::Full => "full",
+            SnapshotType::Delta => "delta",
+        }
+    }
+
+    pub fn from_str(value: &str) -> Self {
+        match value {
+            "delta" => SnapshotType::Delta,
+            _ => SnapshotType::Full,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Snapshot {
+    pub id: Uuid,
+    pub container_id: Uuid,
+    pub label: Option<String>,
+    pub snapshot_type: SnapshotType,
+    pub base_snapshot_id: Option<Uuid>,
+    pub size_bytes: u64,
+    pub created_at: String,
+}
+
+impl Snapshot {
+    pub fn new(container_id: Uuid, label: Option<String>, snapshot_type: SnapshotType) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            container_id,
+            label,
+            snapshot_type,
+            base_snapshot_id: None,
+            size_bytes: 0,
+            created_at: current_timestamp(),
+        }
+    }
+}
+
 fn current_timestamp() -> String {
     time::OffsetDateTime::now_utc()
         .format(&time::format_description::well_known::Rfc3339)

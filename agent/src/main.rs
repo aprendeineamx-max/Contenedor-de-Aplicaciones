@@ -1,6 +1,11 @@
 use agent::{
-    config::AgentConfig, events::EventHub, server, server::AppState, services::ContainerService,
-    store::SqliteStore, telemetry, virtualization::Platform,
+    config::AgentConfig,
+    events::EventHub,
+    server::{self, AppState},
+    services::{AppService, ContainerService, SnapshotService},
+    store::SqliteStore,
+    telemetry,
+    virtualization::Platform,
 };
 use anyhow::Result;
 use tokio::sync::oneshot;
@@ -16,7 +21,6 @@ impl Agent {
     }
 
     pub async fn bootstrap(&self) -> Result<()> {
-        // Crear un contenedor de demostracion para validar el flujo end-to-end.
         let _ = self
             .containers
             .create_container(
@@ -42,6 +46,8 @@ async fn main() -> Result<()> {
     let events = EventHub::new(128);
     let store = SqliteStore::new(&config.database_path).await?;
     let container_service = ContainerService::new(config.clone(), events.clone(), store.clone());
+    let app_service = AppService::new(events.clone(), store.clone());
+    let snapshot_service = SnapshotService::new(events.clone(), store.clone());
 
     let agent = Agent::new(container_service.clone());
     let app_state = AppState::new(
@@ -49,6 +55,8 @@ async fn main() -> Result<()> {
         events.clone(),
         store.clone(),
         container_service.clone(),
+        app_service,
+        snapshot_service,
     );
 
     let (shutdown_tx, shutdown_rx) = oneshot::channel();

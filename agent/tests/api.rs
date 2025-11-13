@@ -4,7 +4,7 @@ use agent::{
     config::AgentConfig,
     events::EventHub,
     server::{self, AppState},
-    services::ContainerService,
+    services::{AppService, ContainerService, SnapshotService},
     store::SqliteStore,
 };
 use reqwest::Client;
@@ -35,11 +35,15 @@ async fn containers_endpoint_creates_tasks() -> anyhow::Result<()> {
     let events = EventHub::new(32);
     let store = SqliteStore::new(&config.database_path).await?;
     let containers = ContainerService::new(config.clone(), events.clone(), store.clone());
+    let apps = AppService::new(events.clone(), store.clone());
+    let snapshots = SnapshotService::new(events.clone(), store.clone());
     let state = AppState::new(
         config.clone(),
         events.clone(),
         store.clone(),
         containers.clone(),
+        apps.clone(),
+        snapshots.clone(),
     );
 
     let (tx, rx) = oneshot::channel();
@@ -75,6 +79,51 @@ async fn containers_endpoint_creates_tasks() -> anyhow::Result<()> {
             .map(|value| value == task_id_str)
             .unwrap_or(false)
     }));
+    let containers_list: Vec<serde_json::Value> = client
+        .get(format!("http://{}/containers", config.api_bind))
+        .send()
+        .await?
+        .json()
+        .await?;
+    let container_id_str = containers_list
+        .first()
+        .and_then(|item| item.get("id"))
+        .and_then(|value| value.as_str())
+        .expect("container id");
+
+    let fetched: serde_json::Value = client
+        .get(format!(
+            "http://{}/containers/{}",
+            config.api_bind, container_id_str
+        ))
+        .send()
+        .await?
+        .json()
+        .await?;
+    assert_eq!(
+        fetched.get("id").unwrap().as_str().unwrap(),
+        container_id_str
+    );
+
+    let delete_task: serde_json::Value = client
+        .delete(format!(
+            "http://{}/containers/{}",
+            config.api_bind, container_id_str
+        ))
+        .send()
+        .await?
+        .json()
+        .await?;
+    assert_eq!(delete_task.get("type").unwrap(), "container.delete");
+
+    let status = client
+        .get(format!(
+            "http://{}/containers/{}",
+            config.api_bind, container_id_str
+        ))
+        .send()
+        .await?;
+    assert_eq!(status.status(), reqwest::StatusCode::NOT_FOUND);
 
     let _ = tx.send(());
     let _ = server_handle.await?;

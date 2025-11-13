@@ -1,12 +1,13 @@
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
-use tokio::sync::Mutex;
+use tokio::{fs, sync::Mutex};
+use uuid::Uuid;
 
 use crate::{
     config::AgentConfig,
     events::{AgentEvent, EventHub},
-    models::{ContainerModel, TaskModel, TaskStatus},
+    models::{AppInstance, ContainerModel, Snapshot, SnapshotType, TaskModel, TaskStatus},
     store::SqliteStore,
     virtualization::{Platform, SandboxDescriptor, SandboxRuntime},
 };
@@ -44,7 +45,7 @@ impl ContainerService {
         let _guard = self.inner.mutex.lock().await;
 
         let mut task = TaskModel::new("container.create").with_status(TaskStatus::Running);
-        task.set_progress(5, Some("Inicializando creación".to_string()));
+        task.set_progress(5, Some("Inicializando creacion".into()));
         self.inner.store.upsert_task(&task).await?;
         self.inner.events.emit(AgentEvent::TaskCreated {
             id: task.id,
@@ -52,21 +53,15 @@ impl ContainerService {
             status: "running".into(),
         });
 
-        let sanitized = name.replace(['/', '\\'], "_");
-        let sandbox_root = self.inner.config.containers_root.join(&sanitized);
-
-        let descriptor = SandboxDescriptor::new(name.clone(), platform.clone(), &sandbox_root);
+        let sandbox_root = container_root(&self.inner.config.containers_root, &name);
+        let descriptor = SandboxDescriptor::new(name.clone(), platform.clone(), sandbox_root);
         let sandbox = SandboxRuntime::new(descriptor);
 
-        if let Err(err) = sandbox
+        sandbox
             .prepare()
             .await
-            .context("No se pudo preparar el filesystem del contenedor")
-        {
-            self.fail_task(task, err.to_string()).await?;
-            return Err(err);
-        }
-        task.set_progress(40, Some("Filesystem y registro preparados".to_string()));
+            .context("No se pudo preparar el filesystem del contenedor")?;
+        task.set_progress(40, Some("Filesystem/registry preparados".into()));
         self.inner.store.upsert_task(&task).await?;
         self.inner.events.emit(AgentEvent::TaskProgress {
             id: task.id,
@@ -74,15 +69,11 @@ impl ContainerService {
             message: "Filesystem/registry preparados".into(),
         });
 
-        if let Err(err) = sandbox
+        sandbox
             .persist_manifest()
             .await
-            .context("No se pudo persistir el manifest del contenedor")
-        {
-            self.fail_task(task, err.to_string()).await?;
-            return Err(err);
-        }
-        task.set_progress(80, Some("Manifest generado".to_string()));
+            .context("No se pudo persistir el manifest del contenedor")?;
+        task.set_progress(80, Some("Manifest generado".into()));
         self.inner.store.upsert_task(&task).await?;
         self.inner.events.emit(AgentEvent::TaskProgress {
             id: task.id,
@@ -92,12 +83,12 @@ impl ContainerService {
 
         let descriptor = sandbox.descriptor().clone();
         let mut container =
-            ContainerModel::new(descriptor.container_id, name.clone(), description, platform);
+            ContainerModel::new(descriptor.container_id, name, description, platform);
         container.touch();
         self.inner.store.upsert_container(&container).await?;
 
         task.status = TaskStatus::Succeeded;
-        task.set_progress(100, Some("Contenedor listo".to_string()));
+        task.set_progress(100, Some("Contenedor listo".into()));
         self.inner.store.upsert_task(&task).await?;
         self.inner.events.emit(AgentEvent::TaskProgress {
             id: task.id,
@@ -112,10 +103,180 @@ impl ContainerService {
         Ok(task)
     }
 
-    pub async fn fail_task(&self, mut task: TaskModel, error: String) -> Result<TaskModel> {
-        task.status = TaskStatus::Failed;
-        task.set_progress(task.progress, Some(error));
+    pub async fn get_container(&self, id: Uuid) -> Result<Option<ContainerModel>> {
+        self.inner.store.get_container(id).await
+    }
+
+    pub async fn delete_container(&self, id: Uuid) -> Result<Option<TaskModel>> {
+        let Some(container) = self.inner.store.get_container(id).await? else {
+            return Ok(None);
+        };
+
+        let mut task = TaskModel::new("container.delete").with_status(TaskStatus::Running);
+        task.set_progress(5, Some("Eliminando contenedor".into()));
         self.inner.store.upsert_task(&task).await?;
+
+        let sandbox_root = container_root(&self.inner.config.containers_root, &container.name);
+        if fs::metadata(&sandbox_root).await.is_ok() {
+            if let Err(err) = fs::remove_dir_all(&sandbox_root).await {
+                tracing::warn!(
+                    ?err,
+                    ?sandbox_root,
+                    "No se pudo eliminar el directorio del contenedor"
+                );
+            }
+        }
+
+        self.inner.store.delete_container(id).await?;
+        task.status = TaskStatus::Succeeded;
+        task.set_progress(100, Some("Contenedor eliminado".into()));
+        self.inner.store.upsert_task(&task).await?;
+        self.inner.events.emit(AgentEvent::TaskProgress {
+            id: task.id,
+            progress: 100,
+            message: "Contenedor eliminado".into(),
+        });
+        self.inner.events.emit(AgentEvent::ContainerStatus {
+            container_id: id,
+            status: "archived".into(),
+        });
+
+        Ok(Some(task))
+    }
+}
+
+#[derive(Clone)]
+pub struct AppService {
+    events: EventHub,
+    store: SqliteStore,
+}
+
+impl AppService {
+    pub fn new(events: EventHub, store: SqliteStore) -> Self {
+        Self { events, store }
+    }
+
+    pub async fn list(&self, container_id: Uuid) -> Result<Vec<AppInstance>> {
+        self.store.list_apps(container_id).await
+    }
+
+    pub async fn install(
+        &self,
+        container_id: Uuid,
+        name: String,
+        version: Option<String>,
+    ) -> Result<TaskModel> {
+        let mut task = TaskModel::new("app.install").with_status(TaskStatus::Running);
+        task.set_progress(20, Some("Iniciando instalacion".into()));
+        self.store.upsert_task(&task).await?;
+        self.events.emit(AgentEvent::TaskCreated {
+            id: task.id,
+            task_type: task.task_type.clone(),
+            status: "running".into(),
+        });
+
+        let mut app = AppInstance::new(container_id, name, version);
+        app.touch();
+        self.store.insert_app(&app).await?;
+
+        task.status = TaskStatus::Succeeded;
+        task.set_progress(100, Some("Aplicacion instalada".into()));
+        self.store.upsert_task(&task).await?;
+        self.events.emit(AgentEvent::TaskProgress {
+            id: task.id,
+            progress: 100,
+            message: "Aplicacion instalada".into(),
+        });
+
         Ok(task)
     }
+
+    pub async fn launch(&self, app_id: Uuid) -> Result<Option<TaskModel>> {
+        let Some(app) = self.store.get_app(app_id).await? else {
+            return Ok(None);
+        };
+        let mut task = TaskModel::new("app.launch").with_status(TaskStatus::Running);
+        task.set_progress(10, Some(format!("Lanzando {}", app.name)));
+        self.store.upsert_task(&task).await?;
+        task.status = TaskStatus::Succeeded;
+        task.set_progress(100, Some("Aplicacion lanzada".into()));
+        self.store.upsert_task(&task).await?;
+        Ok(Some(task))
+    }
+}
+
+#[derive(Clone)]
+pub struct SnapshotService {
+    store: SqliteStore,
+    events: EventHub,
+}
+
+impl SnapshotService {
+    pub fn new(events: EventHub, store: SqliteStore) -> Self {
+        Self { store, events }
+    }
+
+    pub async fn list(&self, container_id: Uuid) -> Result<Vec<Snapshot>> {
+        self.store.list_snapshots(container_id).await
+    }
+
+    pub async fn create(
+        &self,
+        container_id: Uuid,
+        label: Option<String>,
+        snapshot_type: SnapshotType,
+    ) -> Result<TaskModel> {
+        let mut task = TaskModel::new("snapshot.create").with_status(TaskStatus::Running);
+        task.set_progress(25, Some("Capturando snapshot".into()));
+        self.store.upsert_task(&task).await?;
+        self.events.emit(AgentEvent::TaskCreated {
+            id: task.id,
+            task_type: task.task_type.clone(),
+            status: "running".into(),
+        });
+
+        let mut snapshot = Snapshot::new(container_id, label, snapshot_type);
+        snapshot.size_bytes = 0;
+        self.store.insert_snapshot(&snapshot).await?;
+
+        task.status = TaskStatus::Succeeded;
+        task.set_progress(100, Some("Snapshot creado".into()));
+        self.store.upsert_task(&task).await?;
+        self.events.emit(AgentEvent::TaskProgress {
+            id: task.id,
+            progress: 100,
+            message: "Snapshot creado".into(),
+        });
+        Ok(task)
+    }
+
+    pub async fn restore(&self, snapshot_id: Uuid) -> Result<Option<TaskModel>> {
+        let Some(_snapshot) = self.store.get_snapshot(snapshot_id).await? else {
+            return Ok(None);
+        };
+        let mut task = TaskModel::new("snapshot.restore").with_status(TaskStatus::Running);
+        task.set_progress(30, Some("Preparando restauracion".into()));
+        self.store.upsert_task(&task).await?;
+
+        task.status = TaskStatus::Succeeded;
+        task.set_progress(100, Some("Snapshot restaurado".into()));
+        self.store.upsert_task(&task).await?;
+        self.events.emit(AgentEvent::TaskProgress {
+            id: task.id,
+            progress: 100,
+            message: "Snapshot restaurado".into(),
+        });
+        Ok(Some(task))
+    }
+}
+
+fn container_root(root: &Path, name: &str) -> std::path::PathBuf {
+    let sanitized = name
+        .chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '"' | '<' | '>' | '|' => '_',
+            _ => c,
+        })
+        .collect::<String>();
+    root.join(sanitized)
 }
