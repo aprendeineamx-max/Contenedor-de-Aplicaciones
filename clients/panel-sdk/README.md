@@ -63,6 +63,10 @@ All URIs are relative to *https://localhost:7443/api*
 *ContainersApi* | [**containersContainerIdGet**](docs/ContainersApi.md#containerscontaineridget) | **GET** /containers/{containerId} | Obtener contenedor
 *ContainersApi* | [**containersGet**](docs/ContainersApi.md#containersget) | **GET** /containers | Listar contenedores
 *ContainersApi* | [**containersPost**](docs/ContainersApi.md#containerspostoperation) | **POST** /containers | Crear contenedor
+*SecurityApi* | [**securityTokensGet**](docs/SecurityApi.md#securitytokensget) | **GET** /security/tokens | Listar tokens de servicio emitidos
+*SecurityApi* | [**securityTokensPost**](docs/SecurityApi.md#securitytokenspostoperation) | **POST** /security/tokens | Emitir un token de servicio
+*SecurityApi* | [**securityTokensTokenIdDelete**](docs/SecurityApi.md#securitytokenstokeniddelete) | **DELETE** /security/tokens/{tokenId} | Revocar token
+*SecurityApi* | [**systemSecurityReloadPost**](docs/SecurityApi.md#systemsecurityreloadpost) | **POST** /system/security/reload | Recargar configuración y tokens estáticos desde variables de entorno
 *SnapshotsApi* | [**containersContainerIdSnapshotsGet**](docs/SnapshotsApi.md#containerscontaineridsnapshotsget) | **GET** /containers/{containerId}/snapshots | Listar snapshots
 *SnapshotsApi* | [**containersContainerIdSnapshotsPost**](docs/SnapshotsApi.md#containerscontaineridsnapshotspostoperation) | **POST** /containers/{containerId}/snapshots | Crear snapshot
 *SnapshotsApi* | [**snapshotsSnapshotIdRestorePost**](docs/SnapshotsApi.md#snapshotssnapshotidrestorepost) | **POST** /snapshots/{snapshotId}/restore | Restaurar snapshot
@@ -73,6 +77,8 @@ All URIs are relative to *https://localhost:7443/api*
 
 ### Models
 
+- [ApiToken](docs/ApiToken.md)
+- [ApiTokenCreated](docs/ApiTokenCreated.md)
 - [AppInstance](docs/AppInstance.md)
 - [AppInstanceEntryPointsInner](docs/AppInstanceEntryPointsInner.md)
 - [AppsAppIdLaunchPostRequest](docs/AppsAppIdLaunchPostRequest.md)
@@ -80,6 +86,8 @@ All URIs are relative to *https://localhost:7443/api*
 - [ContainersContainerIdAppsPostRequest](docs/ContainersContainerIdAppsPostRequest.md)
 - [ContainersContainerIdSnapshotsPostRequest](docs/ContainersContainerIdSnapshotsPostRequest.md)
 - [ContainersPostRequest](docs/ContainersPostRequest.md)
+- [SecurityStatus](docs/SecurityStatus.md)
+- [SecurityTokensPostRequest](docs/SecurityTokensPostRequest.md)
 - [Snapshot](docs/Snapshot.md)
 - [SystemInfoGet200Response](docs/SystemInfoGet200Response.md)
 - [Task](docs/Task.md)

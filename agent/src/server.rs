@@ -7,7 +7,7 @@ use axum::{
     http::StatusCode,
     middleware::from_fn_with_state,
     response::sse::{Event, KeepAlive, Sse},
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 use futures_core::stream::Stream;
 use serde::{Deserialize, Serialize};
@@ -16,11 +16,11 @@ use tokio_stream::{StreamExt, wrappers::BroadcastStream};
 use uuid::Uuid;
 
 use crate::{
-    config::AgentConfig,
+    config::{AgentConfig, SecurityConfig},
     events::EventHub,
-    models::{AppInstance, ContainerModel, Snapshot, SnapshotType, TaskModel},
+    models::{ApiTokenInfo, AppInstance, ContainerModel, Snapshot, SnapshotType, TaskModel},
     security::{AuthManager, auth_middleware},
-    services::{AppService, ContainerService, SnapshotService},
+    services::{AppService, ContainerService, SnapshotService, TokenService},
     store::SqliteStore,
     virtualization::Platform,
 };
@@ -34,6 +34,7 @@ pub struct AppState {
     pub containers: ContainerService,
     pub apps: AppService,
     pub snapshots: SnapshotService,
+    pub tokens: TokenService,
     pub auth: AuthManager,
     pub started_at: OffsetDateTime,
 }
@@ -46,6 +47,7 @@ impl AppState {
         containers: ContainerService,
         apps: AppService,
         snapshots: SnapshotService,
+        tokens: TokenService,
         auth: AuthManager,
     ) -> Self {
         Self {
@@ -55,6 +57,7 @@ impl AppState {
             containers,
             apps,
             snapshots,
+            tokens,
             auth,
             started_at: OffsetDateTime::now_utc(),
         }
@@ -64,6 +67,7 @@ impl AppState {
 pub async fn serve(state: AppState, shutdown: oneshot::Receiver<()>) -> Result<()> {
     let app = Router::new()
         .route("/system/info", get(system_info))
+        .route("/system/security/reload", post(reload_security))
         .route("/containers", get(list_containers).post(create_container))
         .route(
             "/containers/:container_id",
@@ -82,6 +86,11 @@ pub async fn serve(state: AppState, shutdown: oneshot::Receiver<()>) -> Result<(
         .route("/tasks", get(list_tasks))
         .route("/tasks/:task_id", get(task_detail))
         .route("/events/stream", get(events_stream))
+        .route(
+            "/security/tokens",
+            get(list_api_tokens).post(create_api_token),
+        )
+        .route("/security/tokens/:token_id", delete(revoke_api_token))
         .with_state(state.clone())
         .layer(from_fn_with_state(state.auth.clone(), auth_middleware));
 
@@ -118,6 +127,33 @@ struct SystemInfo {
     build: String,
     uptime_seconds: u64,
     driver_status: String,
+}
+
+#[derive(Serialize)]
+struct SecurityReloadResponse {
+    auth_enabled: bool,
+    admin_token_present: bool,
+    static_token_count: usize,
+    managed_token_count: u64,
+}
+
+async fn reload_security(
+    State(state): State<AppState>,
+) -> Result<Json<SecurityReloadResponse>, StatusCode> {
+    let latest = SecurityConfig::from_env();
+    state.auth.reload(latest).await;
+    let snapshot = state.auth.snapshot().await;
+    let managed = state.store.count_active_tokens().await.map_err(|err| {
+        tracing::error!(?err, "No se pudo contar tokens administrados");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(SecurityReloadResponse {
+        auth_enabled: snapshot.auth_enabled,
+        admin_token_present: snapshot.admin_token_present,
+        static_token_count: snapshot.static_token_count,
+        managed_token_count: managed.max(0) as u64,
+    }))
 }
 
 #[derive(Deserialize)]
@@ -401,4 +437,63 @@ async fn events_stream(
             .interval(Duration::from_secs(10))
             .text("keep-alive"),
     )
+}
+
+#[derive(Deserialize)]
+struct CreateTokenRequest {
+    name: String,
+}
+
+#[derive(Serialize)]
+struct CreateTokenResponse {
+    token: String,
+    #[serde(flatten)]
+    info: ApiTokenInfo,
+}
+
+async fn list_api_tokens(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<ApiTokenInfo>>, StatusCode> {
+    state.tokens.list().await.map(Json).map_err(|err| {
+        tracing::error!(?err, "No se pudieron listar tokens");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })
+}
+
+async fn create_api_token(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateTokenRequest>,
+) -> Result<(StatusCode, Json<CreateTokenResponse>), (StatusCode, String)> {
+    if payload.name.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "El nombre es obligatorio".into()));
+    }
+
+    let issued = state
+        .tokens
+        .issue(payload.name.trim().to_string())
+        .await
+        .map_err(|err| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("No se pudo emitir token: {err}"),
+            )
+        })?;
+
+    let response = CreateTokenResponse {
+        token: issued.secret,
+        info: issued.info,
+    };
+
+    Ok((StatusCode::CREATED, Json(response)))
+}
+
+async fn revoke_api_token(Path(token_id): Path<Uuid>, State(state): State<AppState>) -> StatusCode {
+    match state.tokens.revoke(token_id).await {
+        Ok(true) => StatusCode::NO_CONTENT,
+        Ok(false) => StatusCode::NOT_FOUND,
+        Err(err) => {
+            tracing::error!(?err, token_id = %token_id, "No se pudo revocar token");
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
 }

@@ -1,13 +1,17 @@
 use std::{path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
+use rand::{Rng, distr::Alphanumeric, rng};
 use tokio::{fs, sync::Mutex};
 use uuid::Uuid;
 
 use crate::{
     config::AgentConfig,
     events::{AgentEvent, EventHub},
-    models::{AppInstance, ContainerModel, Snapshot, SnapshotType, TaskModel, TaskStatus},
+    models::{
+        ApiTokenInfo, AppInstance, ContainerModel, Snapshot, SnapshotType, TaskModel, TaskStatus,
+    },
+    security::hash_token,
     store::SqliteStore,
     virtualization::{Platform, SandboxDescriptor, SandboxRuntime},
 };
@@ -279,4 +283,49 @@ fn container_root(root: &Path, name: &str) -> std::path::PathBuf {
         })
         .collect::<String>();
     root.join(sanitized)
+}
+
+#[derive(Clone)]
+pub struct TokenService {
+    store: SqliteStore,
+}
+
+pub struct IssuedToken {
+    pub secret: String,
+    pub info: ApiTokenInfo,
+}
+
+impl TokenService {
+    pub fn new(store: SqliteStore) -> Self {
+        Self { store }
+    }
+
+    pub async fn issue(&self, name: String) -> Result<IssuedToken> {
+        let secret = generate_service_token();
+        let prefix = token_prefix(&secret);
+        let hash = hash_token(&secret);
+        let info = self.store.create_api_token(name, hash, prefix).await?;
+
+        Ok(IssuedToken { secret, info })
+    }
+
+    pub async fn list(&self) -> Result<Vec<ApiTokenInfo>> {
+        self.store.list_api_tokens().await
+    }
+
+    pub async fn revoke(&self, id: Uuid) -> Result<bool> {
+        self.store.revoke_api_token(id).await
+    }
+}
+
+fn generate_service_token() -> String {
+    rng()
+        .sample_iter(&Alphanumeric)
+        .take(48)
+        .map(char::from)
+        .collect()
+}
+
+fn token_prefix(token: &str) -> String {
+    token.chars().take(8).collect()
 }

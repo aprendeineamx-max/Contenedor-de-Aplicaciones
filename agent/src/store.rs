@@ -9,8 +9,8 @@ use tokio::fs;
 use uuid::Uuid;
 
 use crate::models::{
-    AppInstance, AppStatus, ContainerModel, ContainerStatus, Snapshot, SnapshotType, TaskModel,
-    TaskStatus,
+    ApiTokenInfo, AppInstance, AppStatus, ContainerModel, ContainerStatus, Snapshot, SnapshotType,
+    TaskModel, TaskStatus,
 };
 use crate::virtualization::Platform;
 
@@ -93,6 +93,21 @@ impl SqliteStore {
                 base_snapshot_id TEXT,
                 size_bytes INTEGER NOT NULL,
                 created_at TEXT NOT NULL
+            );
+            "#,
+        )
+        .execute(&pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS api_tokens (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                hash TEXT NOT NULL,
+                prefix TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                revoked_at TEXT
             );
             "#,
         )
@@ -348,6 +363,105 @@ impl SqliteStore {
 
         Ok(row.and_then(map_snapshot_row))
     }
+
+    pub async fn create_api_token(
+        &self,
+        name: String,
+        hash: String,
+        prefix: String,
+    ) -> Result<ApiTokenInfo> {
+        let info = ApiTokenInfo {
+            id: Uuid::new_v4(),
+            name,
+            prefix,
+            created_at: now_timestamp(),
+            revoked_at: None,
+        };
+
+        sqlx::query(
+            r#"
+            INSERT INTO api_tokens (id, name, hash, prefix, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5);
+            "#,
+        )
+        .bind(info.id.to_string())
+        .bind(&info.name)
+        .bind(hash)
+        .bind(&info.prefix)
+        .bind(&info.created_at)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(info)
+    }
+
+    pub async fn list_api_tokens(&self) -> Result<Vec<ApiTokenInfo>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT id, name, prefix, created_at, revoked_at
+            FROM api_tokens
+            ORDER BY datetime(created_at) DESC;
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| ApiTokenInfo {
+                id: Uuid::parse_str(row.get::<String, _>("id").as_str()).unwrap(),
+                name: row.get("name"),
+                prefix: row.get("prefix"),
+                created_at: row.get("created_at"),
+                revoked_at: row.get("revoked_at"),
+            })
+            .collect())
+    }
+
+    pub async fn revoke_api_token(&self, id: Uuid) -> Result<bool> {
+        let result = sqlx::query(
+            r#"
+            UPDATE api_tokens
+            SET revoked_at = ?2
+            WHERE id = ?1 AND revoked_at IS NULL;
+            "#,
+        )
+        .bind(id.to_string())
+        .bind(now_timestamp())
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
+    pub async fn verify_api_token_hash(&self, hash: &str) -> Result<bool> {
+        let exists = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT 1 FROM api_tokens
+            WHERE hash = ?1 AND revoked_at IS NULL
+            LIMIT 1;
+            "#,
+        )
+        .bind(hash)
+        .fetch_optional(&self.pool)
+        .await?
+        .is_some();
+
+        Ok(exists)
+    }
+
+    pub async fn count_active_tokens(&self) -> Result<i64> {
+        let count = sqlx::query_scalar::<_, i64>(
+            r#"
+            SELECT COUNT(1) FROM api_tokens
+            WHERE revoked_at IS NULL;
+            "#,
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(count)
+    }
 }
 
 fn map_container_row(row: sqlx::sqlite::SqliteRow) -> Option<ContainerModel> {
@@ -401,6 +515,12 @@ fn map_snapshot_row(row: sqlx::sqlite::SqliteRow) -> Option<Snapshot> {
         size_bytes: row.get::<i64, _>("size_bytes") as u64,
         created_at: row.get("created_at"),
     })
+}
+
+fn now_timestamp() -> String {
+    time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Rfc3339)
+        .unwrap_or_else(|_| "1970-01-01T00:00:00Z".into())
 }
 
 fn normalize_sqlite_path(path: &Path) -> String {

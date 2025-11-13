@@ -59,7 +59,7 @@ impl AgentConfig {
 }
 
 impl SecurityConfig {
-    fn from_env() -> Self {
+    pub fn from_env() -> Self {
         let auth_enabled = std::env::var("ORBIT_AUTH_ENABLED")
             .map(|v| matches!(v.as_str(), "1" | "true" | "TRUE"))
             .unwrap_or(false);

@@ -15,33 +15,39 @@ use crate::{apis::ResponseContent, models};
 use super::{Error, configuration, ContentType};
 
 
-/// struct for typed errors of method [`containers_container_id_snapshots_get`]
+/// struct for typed errors of method [`security_tokens_get`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum ContainersContainerIdSnapshotsGetError {
+pub enum SecurityTokensGetError {
     UnknownValue(serde_json::Value),
 }
 
-/// struct for typed errors of method [`containers_container_id_snapshots_post`]
+/// struct for typed errors of method [`security_tokens_post`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum ContainersContainerIdSnapshotsPostError {
+pub enum SecurityTokensPostError {
     UnknownValue(serde_json::Value),
 }
 
-/// struct for typed errors of method [`snapshots_snapshot_id_restore_post`]
+/// struct for typed errors of method [`security_tokens_token_id_delete`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum SnapshotsSnapshotIdRestorePostError {
+pub enum SecurityTokensTokenIdDeleteError {
+    Status404(),
+    UnknownValue(serde_json::Value),
+}
+
+/// struct for typed errors of method [`system_security_reload_post`]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum SystemSecurityReloadPostError {
     UnknownValue(serde_json::Value),
 }
 
 
-pub async fn containers_container_id_snapshots_get(configuration: &configuration::Configuration, container_id: &str) -> Result<Vec<models::Snapshot>, Error<ContainersContainerIdSnapshotsGetError>> {
-    // add a prefix to parameters to efficiently prevent name collisions
-    let p_path_container_id = container_id;
+pub async fn security_tokens_get(configuration: &configuration::Configuration, ) -> Result<Vec<models::ApiToken>, Error<SecurityTokensGetError>> {
 
-    let uri_str = format!("{}/containers/{containerId}/snapshots", configuration.base_path, containerId=crate::apis::urlencode(p_path_container_id));
+    let uri_str = format!("{}/security/tokens", configuration.base_path);
     let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
 
     if let Some(ref user_agent) = configuration.user_agent {
@@ -66,22 +72,21 @@ pub async fn containers_container_id_snapshots_get(configuration: &configuration
         let content = resp.text().await?;
         match content_type {
             ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
-            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `Vec&lt;models::Snapshot&gt;`"))),
-            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `Vec&lt;models::Snapshot&gt;`")))),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `Vec&lt;models::ApiToken&gt;`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `Vec&lt;models::ApiToken&gt;`")))),
         }
     } else {
         let content = resp.text().await?;
-        let entity: Option<ContainersContainerIdSnapshotsGetError> = serde_json::from_str(&content).ok();
+        let entity: Option<SecurityTokensGetError> = serde_json::from_str(&content).ok();
         Err(Error::ResponseError(ResponseContent { status, content, entity }))
     }
 }
 
-pub async fn containers_container_id_snapshots_post(configuration: &configuration::Configuration, container_id: &str, containers_container_id_snapshots_post_request: Option<models::ContainersContainerIdSnapshotsPostRequest>) -> Result<models::Task, Error<ContainersContainerIdSnapshotsPostError>> {
+pub async fn security_tokens_post(configuration: &configuration::Configuration, security_tokens_post_request: models::SecurityTokensPostRequest) -> Result<models::ApiTokenCreated, Error<SecurityTokensPostError>> {
     // add a prefix to parameters to efficiently prevent name collisions
-    let p_path_container_id = container_id;
-    let p_body_containers_container_id_snapshots_post_request = containers_container_id_snapshots_post_request;
+    let p_body_security_tokens_post_request = security_tokens_post_request;
 
-    let uri_str = format!("{}/containers/{containerId}/snapshots", configuration.base_path, containerId=crate::apis::urlencode(p_path_container_id));
+    let uri_str = format!("{}/security/tokens", configuration.base_path);
     let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
 
     if let Some(ref user_agent) = configuration.user_agent {
@@ -90,7 +95,7 @@ pub async fn containers_container_id_snapshots_post(configuration: &configuratio
     if let Some(ref token) = configuration.bearer_access_token {
         req_builder = req_builder.bearer_auth(token.to_owned());
     };
-    req_builder = req_builder.json(&p_body_containers_container_id_snapshots_post_request);
+    req_builder = req_builder.json(&p_body_security_tokens_post_request);
 
     let req = req_builder.build()?;
     let resp = configuration.client.execute(req).await?;
@@ -107,21 +112,47 @@ pub async fn containers_container_id_snapshots_post(configuration: &configuratio
         let content = resp.text().await?;
         match content_type {
             ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
-            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::Task`"))),
-            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::Task`")))),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::ApiTokenCreated`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::ApiTokenCreated`")))),
         }
     } else {
         let content = resp.text().await?;
-        let entity: Option<ContainersContainerIdSnapshotsPostError> = serde_json::from_str(&content).ok();
+        let entity: Option<SecurityTokensPostError> = serde_json::from_str(&content).ok();
         Err(Error::ResponseError(ResponseContent { status, content, entity }))
     }
 }
 
-pub async fn snapshots_snapshot_id_restore_post(configuration: &configuration::Configuration, snapshot_id: &str) -> Result<models::Task, Error<SnapshotsSnapshotIdRestorePostError>> {
+pub async fn security_tokens_token_id_delete(configuration: &configuration::Configuration, token_id: &str) -> Result<(), Error<SecurityTokensTokenIdDeleteError>> {
     // add a prefix to parameters to efficiently prevent name collisions
-    let p_path_snapshot_id = snapshot_id;
+    let p_path_token_id = token_id;
 
-    let uri_str = format!("{}/snapshots/{snapshotId}/restore", configuration.base_path, snapshotId=crate::apis::urlencode(p_path_snapshot_id));
+    let uri_str = format!("{}/security/tokens/{tokenId}", configuration.base_path, tokenId=crate::apis::urlencode(p_path_token_id));
+    let mut req_builder = configuration.client.request(reqwest::Method::DELETE, &uri_str);
+
+    if let Some(ref user_agent) = configuration.user_agent {
+        req_builder = req_builder.header(reqwest::header::USER_AGENT, user_agent.clone());
+    }
+    if let Some(ref token) = configuration.bearer_access_token {
+        req_builder = req_builder.bearer_auth(token.to_owned());
+    };
+
+    let req = req_builder.build()?;
+    let resp = configuration.client.execute(req).await?;
+
+    let status = resp.status();
+
+    if !status.is_client_error() && !status.is_server_error() {
+        Ok(())
+    } else {
+        let content = resp.text().await?;
+        let entity: Option<SecurityTokensTokenIdDeleteError> = serde_json::from_str(&content).ok();
+        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+    }
+}
+
+pub async fn system_security_reload_post(configuration: &configuration::Configuration, ) -> Result<models::SecurityStatus, Error<SystemSecurityReloadPostError>> {
+
+    let uri_str = format!("{}/system/security/reload", configuration.base_path);
     let mut req_builder = configuration.client.request(reqwest::Method::POST, &uri_str);
 
     if let Some(ref user_agent) = configuration.user_agent {
@@ -146,12 +177,12 @@ pub async fn snapshots_snapshot_id_restore_post(configuration: &configuration::C
         let content = resp.text().await?;
         match content_type {
             ContentType::Json => serde_json::from_str(&content).map_err(Error::from),
-            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::Task`"))),
-            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::Task`")))),
+            ContentType::Text => return Err(Error::from(serde_json::Error::custom("Received `text/plain` content type response that cannot be converted to `models::SecurityStatus`"))),
+            ContentType::Unsupported(unknown_type) => return Err(Error::from(serde_json::Error::custom(format!("Received `{unknown_type}` content type response that cannot be converted to `models::SecurityStatus`")))),
         }
     } else {
         let content = resp.text().await?;
-        let entity: Option<SnapshotsSnapshotIdRestorePostError> = serde_json::from_str(&content).ok();
+        let entity: Option<SystemSecurityReloadPostError> = serde_json::from_str(&content).ok();
         Err(Error::ResponseError(ResponseContent { status, content, entity }))
     }
 }

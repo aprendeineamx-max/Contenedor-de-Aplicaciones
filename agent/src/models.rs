@@ -260,6 +260,15 @@ impl Snapshot {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ApiTokenInfo {
+    pub id: Uuid,
+    pub name: String,
+    pub prefix: String,
+    pub created_at: String,
+    pub revoked_at: Option<String>,
+}
+
 fn current_timestamp() -> String {
     time::OffsetDateTime::now_utc()
         .format(&time::format_description::well_known::Rfc3339)

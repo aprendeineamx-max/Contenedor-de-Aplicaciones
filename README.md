@@ -26,4 +26,20 @@ Plataforma para ejecutar múltiples aplicaciones de escritorio Windows dentro de
 2. Elaborar roadmap con milestones y dependencias.
 3. Preparar PoC de virtualización (Rust + WinFSP/Dokan) antes de construir el stack completo.
 
-\n## Configuracion de seguridad\n- \\ORBIT_AUTH_ENABLED\\: activa el middleware de autenticacion (\\1\\/\\	rue\\).\n- \\ORBIT_ADMIN_TOKEN\\: token Bearer con permisos totales.\n- \\ORBIT_API_TOKENS\\: lista separada por comas (\\	oken1,token2\\).\n\nCuando la autenticacion esta activa, cada request debe enviar \\Authorization: Bearer <token>\\.
+## Configuracion de seguridad
+
+El agente expone middleware Bearer y admite tres variables de entorno principales:
+
+- `ORBIT_AUTH_ENABLED`: activa la autenticacion (usa `1` o `true`).
+- `ORBIT_ADMIN_TOKEN`: credencial maestra con permisos totales (requerido cuando `auth_enabled = true`).
+- `ORBIT_API_TOKENS`: lista separada por comas para tokens estaticos que no se almacenan en la base.
+
+Para recargar cambios sin reiniciar el proceso usa `POST /system/security/reload`, que vuelve a leer las variables anteriores y actualiza el middleware en caliente.
+
+### Tokens de servicio administrados
+
+- `POST /security/tokens`: emite un token de servicio para CLI/automatizaciones, devuelve el valor completo solo una vez.
+- `GET /security/tokens`: lista los tokens con su prefijo y fecha de emision/revocacion.
+- `DELETE /security/tokens/{id}`: revoca un token activo.
+
+Los tokens emitidos se almacenan en la tabla `api_tokens` con hash SHA-256 y los prefijos permiten auditarlos desde la UI o CLI sin exponer el valor real.

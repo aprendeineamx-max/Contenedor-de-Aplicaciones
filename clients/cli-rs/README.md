@@ -34,6 +34,10 @@ Class | Method | HTTP request | Description
 *ContainersApi* | [**containers_container_id_get**](docs/ContainersApi.md#containers_container_id_get) | **GET** /containers/{containerId} | Obtener contenedor
 *ContainersApi* | [**containers_get**](docs/ContainersApi.md#containers_get) | **GET** /containers | Listar contenedores
 *ContainersApi* | [**containers_post**](docs/ContainersApi.md#containers_post) | **POST** /containers | Crear contenedor
+*SecurityApi* | [**security_tokens_get**](docs/SecurityApi.md#security_tokens_get) | **GET** /security/tokens | Listar tokens de servicio emitidos
+*SecurityApi* | [**security_tokens_post**](docs/SecurityApi.md#security_tokens_post) | **POST** /security/tokens | Emitir un token de servicio
+*SecurityApi* | [**security_tokens_token_id_delete**](docs/SecurityApi.md#security_tokens_token_id_delete) | **DELETE** /security/tokens/{tokenId} | Revocar token
+*SecurityApi* | [**system_security_reload_post**](docs/SecurityApi.md#system_security_reload_post) | **POST** /system/security/reload | Recargar configuración y tokens estáticos desde variables de entorno
 *SnapshotsApi* | [**containers_container_id_snapshots_get**](docs/SnapshotsApi.md#containers_container_id_snapshots_get) | **GET** /containers/{containerId}/snapshots | Listar snapshots
 *SnapshotsApi* | [**containers_container_id_snapshots_post**](docs/SnapshotsApi.md#containers_container_id_snapshots_post) | **POST** /containers/{containerId}/snapshots | Crear snapshot
 *SnapshotsApi* | [**snapshots_snapshot_id_restore_post**](docs/SnapshotsApi.md#snapshots_snapshot_id_restore_post) | **POST** /snapshots/{snapshotId}/restore | Restaurar snapshot
@@ -44,6 +48,8 @@ Class | Method | HTTP request | Description
 
 ## Documentation For Models
 
+ - [ApiToken](docs/ApiToken.md)
+ - [ApiTokenCreated](docs/ApiTokenCreated.md)
  - [AppInstance](docs/AppInstance.md)
  - [AppInstanceEntryPointsInner](docs/AppInstanceEntryPointsInner.md)
  - [AppsAppIdLaunchPostRequest](docs/AppsAppIdLaunchPostRequest.md)
@@ -51,6 +57,8 @@ Class | Method | HTTP request | Description
  - [ContainersContainerIdAppsPostRequest](docs/ContainersContainerIdAppsPostRequest.md)
  - [ContainersContainerIdSnapshotsPostRequest](docs/ContainersContainerIdSnapshotsPostRequest.md)
  - [ContainersPostRequest](docs/ContainersPostRequest.md)
+ - [SecurityStatus](docs/SecurityStatus.md)
+ - [SecurityTokensPostRequest](docs/SecurityTokensPostRequest.md)
  - [Snapshot](docs/Snapshot.md)
  - [SystemInfoGet200Response](docs/SystemInfoGet200Response.md)
  - [Task](docs/Task.md)

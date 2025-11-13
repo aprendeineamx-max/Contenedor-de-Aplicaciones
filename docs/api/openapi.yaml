@@ -14,6 +14,7 @@ tags:
   - name: Snapshots
   - name: Tasks
   - name: System
+  - name: Security
 components:
   securitySchemes:
     bearerAuth:
@@ -99,6 +100,39 @@ components:
         result: { type: object }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+    ApiToken:
+      type: object
+      required: [id, name, prefix, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        prefix: { type: string }
+        created_at: { type: string, format: date-time }
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+    ApiTokenCreated:
+      type: object
+      required: [token, info]
+      properties:
+        token:
+          type: string
+          description: Token completo devuelto solo una vez
+        info:
+          $ref: '#/components/schemas/ApiToken'
+    SecurityStatus:
+      type: object
+      required:
+        - auth_enabled
+        - admin_token_present
+        - static_token_count
+        - managed_token_count
+      properties:
+        auth_enabled: { type: boolean }
+        admin_token_present: { type: boolean }
+        static_token_count: { type: integer }
+        managed_token_count: { type: integer }
 paths:
   /containers:
     get:
@@ -355,5 +389,66 @@ paths:
                   build: { type: string }
                   uptime_seconds: { type: integer }
                   driver_status: { type: string }
+  /system/security/reload:
+    post:
+      tags: [Security]
+      summary: Recargar configuración y tokens estáticos desde variables de entorno
+      responses:
+        '200':
+          description: Estado de seguridad actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecurityStatus'
+  /security/tokens:
+    get:
+      tags: [Security]
+      summary: Listar tokens de servicio emitidos
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApiToken'
+    post:
+      tags: [Security]
+      summary: Emitir un token de servicio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  description: Etiqueta descriptiva del token
+      responses:
+        '201':
+          description: Token emitido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiTokenCreated'
+  /security/tokens/{tokenId}:
+    delete:
+      tags: [Security]
+      summary: Revocar token
+      parameters:
+        - name: tokenId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Token revocado
+        '404':
+          description: Token inexistente
 security:
   - bearerAuth: []
