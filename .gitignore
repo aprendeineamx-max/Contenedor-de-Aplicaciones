@@ -3,3 +3,5 @@
 /orbit-data/
 /sandboxes/
 agent-run-*.log
+panel/.env.local
+!panel/.env.local.example

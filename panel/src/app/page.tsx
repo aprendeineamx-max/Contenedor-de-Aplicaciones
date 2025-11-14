@@ -1,100 +1,99 @@
-'use client';
+import { fetchContainers, fetchTasks } from '@/lib/orbit';
+import { SystemConfigForm } from '@/components/SystemConfigForm';
 
-import { useState } from 'react';
+async function loadServerData() {
+  const baseUrl = process.env.ORBIT_PANEL_BASE_URL;
+  const token = process.env.ORBIT_PANEL_TOKEN;
 
-export default function Home() {
-  const [baseUrl, setBaseUrl] = useState('http://127.0.0.1:7443');
-  const [token, setToken] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [snapshot, setSnapshot] = useState<unknown>(null);
+  if (!baseUrl || !token) {
+    return {
+      containers: [],
+      tasks: [],
+      error: 'Define ORBIT_PANEL_BASE_URL y ORBIT_PANEL_TOKEN en panel/.env.local para precargar datos.',
+    } as const;
+  }
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSnapshot(null);
+  try {
+    const [containers, tasks] = await Promise.all([
+      fetchContainers(baseUrl, token),
+      fetchTasks(baseUrl, token, 10),
+    ]);
+    return { containers: containers ?? [], tasks: tasks ?? [], error: undefined } as const;
+  } catch (error) {
+    console.error('SSR: no se pudo consultar el agente', error);
+    return {
+      containers: [],
+      tasks: [],
+      error: 'No se pudo consultar el agente con las credenciales del servidor.',
+    } as const;
+  }
+}
 
-    try {
-      const response = await fetch('/api/system-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl, token }),
-      });
+export const dynamic = 'force-dynamic';
 
-      if (!response.ok) {
-        const message = (await response.json().catch(() => null))?.error ?? 'Error desconocido';
-        throw new Error(message);
-      }
-
-      const data = await response.json();
-      setSnapshot(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error inesperado');
-    } finally {
-      setLoading(false);
-    }
-  };
+export default async function Home() {
+  const { containers, tasks, error } = await loadServerData();
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <main className="mx-auto flex max-w-3xl flex-col gap-8 px-6 py-12">
+      <main className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-12">
         <header className="space-y-2">
           <p className="text-sm uppercase tracking-wide text-slate-500">Panel PoC</p>
-          <h1 className="text-3xl font-semibold">Consultar /system/config</h1>
+          <h1 className="text-3xl font-semibold">Estado del agente</h1>
           <p className="text-slate-600">
-            Ingresa la URL del agente y el token admin o de servicio con alcance completo para validar la conexión
-            antes de montar la UI real.
+            La tabla se genera en SSR usando las variables ORBIT_PANEL_BASE_URL / ORBIT_PANEL_TOKEN, mientras que el
+            formulario permite probar otras instancias con un token diferente.
           </p>
         </header>
 
-        <form onSubmit={handleSubmit} className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Base URL</label>
-            <input
-              type="url"
-              value={baseUrl}
-              onChange={(event) => setBaseUrl(event.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              placeholder="http://127.0.0.1:7443"
-              required
-            />
+        {error && (
+          <p className="rounded-lg bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
+            {error}
+          </p>
+        )}
+
+        <section className="grid gap-6 md:grid-cols-2">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold">Contenedores recientes</h2>
+            {containers.length ? (
+              <ul className="space-y-3 text-sm text-slate-700">
+                {containers.slice(0, 5).map((container) => (
+                  <li key={container.id} className="rounded-lg border border-slate-100 px-4 py-3">
+                    <p className="font-medium">{container.name || container.id}</p>
+                    <p className="text-xs text-slate-500">Estado: {container.status}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500">No hay contenedores para mostrar.</p>
+            )}
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Token</label>
-            <input
-              type="password"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-slate-500 focus:outline-none"
-              placeholder="ORBIT_ADMIN_TOKEN"
-              required
-            />
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold">Últimas tareas</h2>
+            {tasks.length ? (
+              <ul className="space-y-3 text-sm text-slate-700">
+                {tasks.slice(0, 5).map((task) => (
+                  <li key={task.id} className="rounded-lg border border-slate-100 px-4 py-3">
+                    <p className="font-medium">{task.type}</p>
+                    <p className="text-xs text-slate-500">
+                      ID: {task.id} — Estado: <span className="uppercase">{task.status}</span>
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500">Aún no hay tareas registradas.</p>
+            )}
           </div>
-
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={loading}
-          >
-            {loading ? 'Consultando…' : 'Consultar snapshot'}
-          </button>
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-        </form>
-
-        <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold">Resultado</h2>
-          {snapshot ? (
-            <pre className="max-h-[420px] overflow-auto rounded-lg bg-slate-950/90 p-4 text-sm text-slate-50">
-              {JSON.stringify(snapshot, null, 2)}
-            </pre>
-          ) : (
-            <p className="text-sm text-slate-500">Aún no hay datos. Ejecuta la consulta para ver el snapshot.</p>
-          )}
         </section>
+
+        <SystemConfigForm
+          defaultBaseUrl={process.env.ORBIT_PANEL_BASE_URL}
+          defaultToken={process.env.ORBIT_PANEL_TOKEN}
+        />
       </main>
     </div>
   );
 }
+

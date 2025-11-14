@@ -74,3 +74,8 @@ Ejecuta `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/profile-tes
 ### Panel web PoC
 - `cd panel && npm install && npm run dev` levanta un formulario minimalista (Next.js 16 + Tailwind) que usa el SDK TypeScript y el endpoint `/system/config`. Solo necesitas ingresar `baseUrl` y `token` para validar conectividad antes de construir vistas más complejas.
 - `npm run panel-flow` ejecuta el mismo flujo desde Node (listar contenedores ? crear uno ? consultar `/tasks`), ideal para QA sin UI.
+
+
+### Verificaciones automatizadas
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-verifications.ps1` ejecuta el perfilador (`scripts/profile-tests.ps1`), `npm run smoke` y `npm run panel-flow` en secuencia. Cada corrida genera un CSV con timestamp en `artifacts/` para rastrear el error 1455.
+- El endpoint raíz (`http://127.0.0.1:7443/`) responde 404 por diseño; usa `/system/info` para validar que el agente esté en pie antes de abrir el panel.
