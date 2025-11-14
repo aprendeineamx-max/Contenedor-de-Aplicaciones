@@ -69,3 +69,8 @@ Ejecuta `npm run smoke` desde la raiz para lanzar el agente temporalmente (con `
 
 Ejecuta `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/profile-tests.ps1` para lanzar `cargo test -p agent -- --test-threads=1` mientras se muestrean los procesos `cargo.exe`, `rustc.exe` y `link.exe`. Los datos se guardan (CSV) en `artifacts/mem-log.csv` con columnas `timestamp,process_name,pid,working_set_mb,virtual_mb`. Ajusta los parametros `-Command`, `-IntervalMs` o `-LogPath` segun sea necesario. Este mecanismo genera evidencia del consumo previo al error 1455 y deja trazabilidad directa para reportarlo.
 
+
+
+### Panel web PoC
+- `cd panel && npm install && npm run dev` levanta un formulario minimalista (Next.js 16 + Tailwind) que usa el SDK TypeScript y el endpoint `/system/config`. Solo necesitas ingresar `baseUrl` y `token` para validar conectividad antes de construir vistas más complejas.
+- `npm run panel-flow` ejecuta el mismo flujo desde Node (listar contenedores ? crear uno ? consultar `/tasks`), ideal para QA sin UI.
