@@ -61,7 +61,11 @@ Ejecuta `npm run smoke` desde la raiz para lanzar el agente temporalmente (con `
 ### Inspeccion rapida del entorno
 - **Panel SDK**: `ORBIT_BASE_URL=http://127.0.0.1:7443 ORBIT_ADMIN_TOKEN=<token> npm run inspect-config` mostrara el snapshot de configuracion y las fuentes aplicadas.
 - **CLI SDK**: `cd clients/cli-rs && ORBIT_BASE_URL=http://127.0.0.1:7443 ORBIT_ADMIN_TOKEN=<token> cargo run --example system_config --features rustls-tls` (o `--features native-tls`) imprime el mismo snapshot usando el SDK Rust.
+- **Nueva CLI (`orbit`)**: `cargo run -p cli -- system config --base-url http://127.0.0.1:7443 --admin-token <token>` devolverA el mismo snapshot (usa por defecto las variables `ORBIT_BASE_URL` y `ORBIT_ADMIN_TOKEN`). Usa `--format json` para salida compacta.
+- **Panel flow**: `ORBIT_BASE_URL=http://127.0.0.1:7443 ORBIT_ADMIN_TOKEN=<token> npm run panel-flow` ejecuta un ciclo panel-like (listar contenedores, crear uno nuevo y consultar /tasks) usando el SDK TypeScript. Usa este script tras cada cambio del backend para validar la integración sin interfaz.
+
 
 ### Perfilado y logs de memoria para `cargo test`
 
 Ejecuta `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/profile-tests.ps1` para lanzar `cargo test -p agent -- --test-threads=1` mientras se muestrean los procesos `cargo.exe`, `rustc.exe` y `link.exe`. Los datos se guardan (CSV) en `artifacts/mem-log.csv` con columnas `timestamp,process_name,pid,working_set_mb,virtual_mb`. Ajusta los parametros `-Command`, `-IntervalMs` o `-LogPath` segun sea necesario. Este mecanismo genera evidencia del consumo previo al error 1455 y deja trazabilidad directa para reportarlo.
+

@@ -2,3 +2,4 @@
 **/node_modules
 /orbit-data/
 /sandboxes/
+agent-run-*.log

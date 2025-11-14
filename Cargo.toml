@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "agent",
+    "agent", "cli",
     "clients/cli-rs"
 ]
 resolver = "2"
