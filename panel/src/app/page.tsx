@@ -20,8 +20,8 @@ async function loadServerData() {
       fetchTasks(baseUrl, token, 50),
     ]);
     return { containers: containers ?? [], tasks: tasks ?? [], error: undefined } as const;
-  } catch (error) {
-    console.error('SSR: no se pudo consultar el agente', error);
+  } catch (err) {
+    console.error('SSR: no se pudo consultar el agente', err);
     return {
       containers: [],
       tasks: [],
@@ -54,10 +54,37 @@ export default async function Home({ searchParams }: { searchParams: PageSearchP
           <p className="text-sm uppercase tracking-wide text-slate-500">Panel PoC</p>
           <h1 className="text-3xl font-semibold">Estado del agente</h1>
           <p className="text-slate-600">
-            La tabla se genera en SSR usando las variables ORBIT_PANEL_BASE_URL / ORBIT_PANEL_TOKEN. El formulario
-            permite probar otros entornos manualmente con un token diferente.
+            La tabla se genera en SSR usando las variables ORBIT_PANEL_BASE_URL / ORBIT_PANEL_TOKEN. El formulario permite
+            probar otros entornos manualmente con un token diferente.
           </p>
         </header>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
+          <h2 className="mb-3 text-lg font-semibold text-slate-900">Guia rapida del panel</h2>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <span className="font-medium text-slate-900">Contenedores:</span> muestra el estado, nombre y plataforma de
+              cada sandbox. Usa el paginador inferior para recorrer bloques de cinco elementos.
+            </li>
+            <li>
+              <span className="font-medium text-slate-900">Formulario &quot;Nombre&quot; y selector &quot;Plataforma&quot;:</span> definen
+              como se creara el contenedor. El nombre identifica la instancia y la plataforma invoca la plantilla de
+              recursos (windows-x64 o windows-arm64).
+            </li>
+            <li>
+              <span className="font-medium text-slate-900">Botones Crear / Eliminar:</span> crean el contenedor con las
+              credenciales del panel o borran la seleccion actual registrando una tarea de auditoria.
+            </li>
+            <li>
+              <span className="font-medium text-slate-900">Ultimas tareas:</span> valida en segundos si la operacion termino
+              bien. Si ves estados distintos a &quot;succeeded&quot; revisa logs del agente.
+            </li>
+            <li>
+              <span className="font-medium text-slate-900">Consultar manualmente /system/config:</span> permite probar otros
+              tokens/urls desde la misma pagina y guardar el snapshot para QA.
+            </li>
+          </ul>
+        </section>
 
         {error && <p className="rounded-lg bg-yellow-50 px-4 py-3 text-sm text-yellow-900">{error}</p>}
 
@@ -65,7 +92,7 @@ export default async function Home({ searchParams }: { searchParams: PageSearchP
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold">Contenedores</h2>
-              <p className="text-sm text-slate-500">Página {safePage} de {totalPages}</p>
+              <p className="text-sm text-slate-500">Pagina {safePage} de {totalPages}</p>
             </div>
             <form action={createContainerAction} className="flex flex-wrap gap-2 text-sm">
               <input
@@ -124,33 +151,33 @@ export default async function Home({ searchParams }: { searchParams: PageSearchP
               aria-disabled={safePage <= 1}
               href={safePage <= 1 ? '#' : `/?page=${safePage - 1}`}
             >
-              ? Anterior
+              Anterior
             </a>
             <a
               className={`rounded px-3 py-1 ${safePage >= totalPages ? 'cursor-not-allowed opacity-50' : 'hover:bg-slate-100'}`}
               aria-disabled={safePage >= totalPages}
               href={safePage >= totalPages ? '#' : `/?page=${safePage + 1}`}
             >
-              Siguiente ?
+              Siguiente
             </a>
           </div>
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold">Últimas tareas</h2>
+          <h2 className="mb-4 text-lg font-semibold">Ultimas tareas</h2>
           {tasks.length ? (
             <ul className="space-y-3 text-sm text-slate-700">
               {tasks.slice(0, 5).map((task) => (
                 <li key={task.id} className="rounded-lg border border-slate-100 px-4 py-3">
                   <p className="font-medium">{task.type}</p>
                   <p className="text-xs text-slate-500">
-                    ID: {task.id} — Estado: <span className="uppercase">{task.status}</span>
+                    ID: {task.id} - Estado: <span className="uppercase">{task.status}</span>
                   </p>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-slate-500">Aún no hay tareas registradas.</p>
+            <p className="text-sm text-slate-500">Aun no hay tareas registradas.</p>
           )}
         </section>
 
@@ -162,4 +189,3 @@ export default async function Home({ searchParams }: { searchParams: PageSearchP
     </div>
   );
 }
-

@@ -46,6 +46,9 @@ export function SystemConfigForm({ defaultBaseUrl = 'http://127.0.0.1:7443', def
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <label className="text-sm font-medium text-slate-700">Base URL</label>
+          <p className="text-xs text-slate-500">
+            Direccion del agente (por ejemplo http://127.0.0.1:7443). Cambiala cuando valides otra maquina.
+          </p>
           <input
             type="url"
             value={baseUrl}
@@ -56,6 +59,9 @@ export function SystemConfigForm({ defaultBaseUrl = 'http://127.0.0.1:7443', def
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium text-slate-700">Token</label>
+          <p className="text-xs text-slate-500">
+            Usa un token con scope de admin para leer todos los campos. Solo se envia cuando presionas consultar.
+          </p>
           <input
             type="password"
             value={token}
@@ -69,8 +75,11 @@ export function SystemConfigForm({ defaultBaseUrl = 'http://127.0.0.1:7443', def
           className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
           disabled={loading}
         >
-          {loading ? 'Consultando…' : 'Consultar snapshot'}
+          {loading ? 'Consultando...' : 'Consultar snapshot'}
         </button>
+        <p className="text-xs text-slate-500">
+          El resultado corresponde al endpoint /system/config del agente seleccionado.
+        </p>
         {error && <p className="text-sm text-red-600">{error}</p>}
       </form>
 
@@ -78,7 +87,7 @@ export function SystemConfigForm({ defaultBaseUrl = 'http://127.0.0.1:7443', def
         {snapshot ? (
           <pre className="max-h-[320px] overflow-auto text-sm">{JSON.stringify(snapshot, null, 2)}</pre>
         ) : (
-          <p className="text-sm text-slate-400">Aún no hay datos. Ejecuta la consulta para ver el snapshot.</p>
+          <p className="text-sm text-slate-400">Aun no hay datos. Ejecuta la consulta para ver el snapshot.</p>
         )}
       </section>
     </div>
