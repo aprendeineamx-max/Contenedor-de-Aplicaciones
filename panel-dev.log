@@ -70,3 +70,4 @@ Error: Route "/" used `searchParams.page`. `searchParams` is a Promise and must 
  ✓ Starting...
  ✓ Ready in 1214ms
  GET / 200 in 2.9s (compile: 2.6s, render: 297ms)
+ GET / 200 in 119ms (compile: 5ms, render: 115ms)
