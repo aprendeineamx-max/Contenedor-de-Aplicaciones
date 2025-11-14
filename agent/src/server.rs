@@ -582,8 +582,11 @@ async fn revoke_api_token(
 
 fn ensure_admin(ctx: &AuthContext) -> Result<(), StatusCode> {
     match ctx {
-        AuthContext::Admin | AuthContext::StaticToken { .. } => Ok(()),
-        AuthContext::ServiceToken { .. } => Err(StatusCode::FORBIDDEN),
+        AuthContext::Admin => Ok(()),
+        other => {
+            tracing::warn!(?other, "Intento de acceso admin sin privilegios");
+            Err(StatusCode::FORBIDDEN)
+        }
     }
 }
 
@@ -591,6 +594,7 @@ fn ensure_scope(ctx: &AuthContext, scope: &str) -> Result<(), StatusCode> {
     if has_scope(ctx, scope) {
         Ok(())
     } else {
+        tracing::warn!(?ctx, scope, "Token sin scope requerido");
         Err(StatusCode::FORBIDDEN)
     }
 }
