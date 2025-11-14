@@ -1,0 +1,5 @@
+    Blocking waiting for file lock on package cache
+   Compiling agent v0.1.0 (C:\Users\Administrator\Contenedor de Aplicaciones\agent)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.29s
+     Running `target\debug\agent.exe`
+error: process didn't exit successfully: `target\debug\agent.exe` (exit code: 0xffffffff)

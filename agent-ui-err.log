@@ -1,0 +1,3 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.35s
+     Running `target\debug\agent.exe`
+error: process didn't exit successfully: `target\debug\agent.exe` (exit code: 0xffffffff)
