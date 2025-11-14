@@ -2,13 +2,14 @@ param(
     [string]$MemLogPrefix = 'artifacts/mem-log-ci'
 )
 
-$workspace = Split-Path -Parent $MyInvocation.MyCommand.Path
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$workspace = Split-Path -Parent $scriptDir
 Set-Location $workspace
 
 Write-Host ':: Profiling scoped_tokens_limit_permissions'
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $memLog = "$MemLogPrefix-$timestamp.csv"
-$profile = Join-Path $workspace 'scripts/profile-tests.ps1'
+$profile = Join-Path $scriptDir 'profile-tests.ps1'
 $command = "& `"$env:USERPROFILE\.cargo\bin\cargo.exe`" test -p agent scoped_tokens_limit_permissions -- --test-threads=1 --nocapture"
 powershell -NoProfile -ExecutionPolicy Bypass -File $profile -Command $command -LogPath $memLog
 if ($LASTEXITCODE -ne 0) { throw 'Perfil falló' }

@@ -37,3 +37,32 @@ export async function fetchTasks(
   return api.tasksGet({ limit });
 }
 
+export async function createContainer(
+  baseUrl: string,
+  token: string,
+  name: string,
+  platform: string,
+) {
+  const configuration = new Configuration({
+    basePath: baseUrl.replace(/\/$/, ''),
+    accessToken: token,
+  });
+  const api = new ContainersApi(configuration);
+  return api.containersPost({
+    containersPostRequest: { name, platform },
+  });
+}
+
+export async function deleteContainer(
+  baseUrl: string,
+  token: string,
+  containerId: string,
+) {
+  const configuration = new Configuration({
+    basePath: baseUrl.replace(/\/$/, ''),
+    accessToken: token,
+  });
+  const api = new ContainersApi(configuration);
+  return api.containersContainerIdDelete({ containerId });
+}
+
