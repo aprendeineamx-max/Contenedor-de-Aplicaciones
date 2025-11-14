@@ -34,9 +34,14 @@ export const dynamic = 'force-dynamic';
 
 const PER_PAGE = 5;
 
-export default async function Home({ searchParams }: { searchParams: { page?: string } }) {
+type PageSearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+export default async function Home({ searchParams }: { searchParams: PageSearchParams }) {
+  const resolvedSearchParams = await searchParams;
+  const rawPage = resolvedSearchParams?.page;
+  const normalizedPage = Array.isArray(rawPage) ? rawPage[0] : rawPage;
   const { containers, tasks, error } = await loadServerData();
-  const page = Math.max(1, Number(searchParams?.page ?? '1'));
+  const page = Math.max(1, Number(normalizedPage ?? '1'));
   const totalPages = Math.max(1, Math.ceil(containers.length / PER_PAGE));
   const safePage = Math.min(page, totalPages);
   const start = (safePage - 1) * PER_PAGE;
@@ -60,7 +65,7 @@ export default async function Home({ searchParams }: { searchParams: { page?: st
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold">Contenedores</h2>
-              <p className="text-sm text-slate-500">Página {safePage} de {totalPages}</p>
+              <p className="text-sm text-slate-500">PÃ¡gina {safePage} de {totalPages}</p>
             </div>
             <form action={createContainerAction} className="flex flex-wrap gap-2 text-sm">
               <input
@@ -132,20 +137,20 @@ export default async function Home({ searchParams }: { searchParams: { page?: st
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold">Últimas tareas</h2>
+          <h2 className="mb-4 text-lg font-semibold">Ãšltimas tareas</h2>
           {tasks.length ? (
             <ul className="space-y-3 text-sm text-slate-700">
               {tasks.slice(0, 5).map((task) => (
                 <li key={task.id} className="rounded-lg border border-slate-100 px-4 py-3">
                   <p className="font-medium">{task.type}</p>
                   <p className="text-xs text-slate-500">
-                    ID: {task.id} — Estado: <span className="uppercase">{task.status}</span>
+                    ID: {task.id} â€” Estado: <span className="uppercase">{task.status}</span>
                   </p>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-slate-500">Aún no hay tareas registradas.</p>
+            <p className="text-sm text-slate-500">AÃºn no hay tareas registradas.</p>
           )}
         </section>
 
