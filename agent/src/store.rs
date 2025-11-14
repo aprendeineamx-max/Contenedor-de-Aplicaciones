@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde_json;
 use sqlx::{
-    Error as SqlxError, Row, SqlitePool,
+    Error as SqlxError, QueryBuilder, Row, SqlitePool,
     sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
 use std::{path::Path, str::FromStr};
@@ -236,31 +236,22 @@ impl SqliteStore {
     }
 
     pub async fn list_tasks(
-        self: &SqliteStore,
+        &self,
         status: Option<String>,
         limit: Option<i64>,
     ) -> Result<Vec<TaskModel>> {
-        let mut query = String::from(
+        let mut builder = QueryBuilder::new(
             "SELECT id, type, status, progress, message, created_at, updated_at FROM tasks",
         );
-        if status.is_some() {
-            query.push_str(" WHERE status = ?1");
+        if let Some(status) = &status {
+            builder.push(" WHERE status = ").push_bind(status);
         }
-        query.push_str(" ORDER BY datetime(created_at) DESC");
-        if limit.is_some() {
-            query.push_str(" LIMIT ?2");
-        }
-        query.push(';');
-
-        let mut statement = sqlx::query(&query);
-        if let Some(status) = status {
-            statement = statement.bind(status);
-        }
+        builder.push(" ORDER BY datetime(created_at) DESC");
         if let Some(limit) = limit {
-            statement = statement.bind(limit);
+            builder.push(" LIMIT ").push_bind(limit);
         }
 
-        let rows = statement.fetch_all(&self.pool).await?;
+        let rows = builder.build().fetch_all(&self.pool).await?;
         Ok(rows.into_iter().filter_map(map_task_row).collect())
     }
 
